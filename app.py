@@ -3,6 +3,7 @@ import pandas as pd
 import random
 import time
 
+# Configuración de página al inicio
 st.set_page_config(page_title="Simulador de Examen", page_icon="🎓", layout="centered")
 
 # --- ESTILOS PERSONALIZADOS (CSS) ---
@@ -23,7 +24,7 @@ st.markdown("""
 SHEET_ID = "1KR7OfGpqNm0aZMu3sHl2tqwRa_7AiTqENehNHjL82qM"
 CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv"
 
-@st.cache_data(ttl=10)
+@st.cache_data(ttl=60)
 def load_data():
     try:
         data = pd.read_csv(CSV_URL)
@@ -32,42 +33,53 @@ def load_data():
     except:
         return None
 
-# --- INICIALIZACIÓN ---
+# --- INICIALIZACIÓN DE VARIABLES (SESSION STATE) ---
 if 'examen_iniciado' not in st.session_state:
     st.session_state.examen_iniciado = False
-    st.session_state.indice_actual = 0
-    st.session_state.aciertos = 0
-    st.session_state.respondido = False
+if 'finalizado' not in st.session_state:
     st.session_state.finalizado = False
+if 'indice_actual' not in st.session_state:
+    st.session_state.indice_actual = 0
+if 'aciertos' not in st.session_state:
+    st.session_state.aciertos = 0
+if 'respondido' not in st.session_state:
+    st.session_state.respondido = False
+if 'preguntas_examen' not in st.session_state:
     st.session_state.preguntas_examen = []
+if 'eleccion' not in st.session_state:
     st.session_state.eleccion = None
+if 'inicio_tiempo' not in st.session_state:
     st.session_state.inicio_tiempo = None
 
 df = load_data()
 
-# --- VISTA: INICIO ---
+# --- VISTA 1: PANTALLA DE INICIO ---
 if not st.session_state.examen_iniciado and not st.session_state.finalizado:
     st.title("🎓 Simulador de Examen")
     if df is not None:
-        st.write(f"Preguntas disponibles: **{len(df)}**")
-        st.write("⏱️ Tiempo límite: **1 hora y 30 minutos**")
+        st.write(f"Preguntas disponibles en base: **{len(df)}**")
+        st.info("⏱️ Tienes **1 hora y 30 minutos** para completar 60 preguntas.")
+        
         if st.button("🚀 COMENZAR EXAMEN", use_container_width=True, type="primary"):
-            # Lógica corregida y simplificada para evitar SyntaxError
-            total_preguntas = len(df)
-            cantidad = min(60, total_preguntas)
-            lista_indices = list(range(total_preguntas))
-            indices_aleatorios = random.sample(lista_indices, cantidad)
+            # Generar preguntas
+            pool = df.to_dict('records')
+            cantidad = min(60, len(pool))
+            st.session_state.preguntas_examen = random.sample(pool, cantidad)
             
-            st.session_state.preguntas_examen = df.iloc[indices_aleatorios].to_dict('records')
-            st.session_state.examen_iniciado = True
+            # Marcar inicio
             st.session_state.inicio_tiempo = time.time()
+            st.session_state.examen_iniciado = True
+            st.session_state.indice_actual = 0
+            st.session_state.aciertos = 0
             st.rerun()
+    else:
+        st.error("No se pudo cargar el Excel. Revisa el link y los permisos.")
 
-# --- VISTA: RESULTADOS ---
+# --- VISTA 2: RESULTADOS ---
 elif st.session_state.finalizado:
-    st.title("🏁 Resultados")
-    st.metric("Aciertos", f"{st.session_state.aciertos} / {len(st.session_state.preguntas_examen)}")
-    if st.button("🔄 Intentar de nuevo", use_container_width=True):
+    st.title("🏁 Examen Finalizado")
+    total_p = len(st.session_state.preguntas_examen)
+    st.metric("Puntaje Final", f"{st.session_state.aciertos} / {total_p}")
+    
+    if st.button("🔄 Volver al Inicio", use_container_width=True):
         st.session_state.examen_iniciado = False
-        st.session_state.finalizado = False
-        st.session_state.indice_actual = 0
