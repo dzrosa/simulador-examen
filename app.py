@@ -49,62 +49,66 @@ def cargar_datos():
 
 df_preguntas, df_usuarios = cargar_datos()
 
-# 3. ESTILOS CSS (CORRECCIÓN TOTAL DE CONTRASTE E INPUTS)
+# 3. ESTILOS CSS (ULTRA-CONTRASTE PARA INPUTS Y BOTONES)
 st.markdown("""
     <style>
-    /* 1. Fondo general blanco y texto oscuro */
-    html, body, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
+    /* 1. Fondo general y textos */
+    html, body, [data-testid="stAppViewContainer"] {
         background-color: white !important;
         color: #1e293b !important;
     }
 
-    /* 2. Forzar color en todos los textos */
-    .stMarkdown, p, span, label, .stCaption, h1, h2, h3, .stSelectbox label {
-        color: #1e293b !important;
-    }
-
-    /* 3. INPUTS Y SELECTORES (Fondo blanco, texto negro) */
-    input[type="text"], input[type="password"], [data-baseweb="select"], [data-baseweb="popover"] {
+    /* 2. INPUTS (Email y PIN) - Forzar fondo blanco y texto negro siempre */
+    [data-testid="stTextInput"] input {
         background-color: white !important;
-        color: #1e293b !important;
-        border: 1px solid #cbd5e1 !important;
-    }
-    
-    /* Corregir el texto dentro de los campos de texto al escribir */
-    input {
         color: #1e293b !important;
         -webkit-text-fill-color: #1e293b !important;
+        border: 1px solid #cbd5e1 !important;
     }
 
-    /* 4. BOTÓN CTA (Primario: Azul con texto Blanco) */
-    .stButton>button[kind="primary"] {
+    /* 3. INPUTS CUANDO SE HACER CLIC (Focus) */
+    [data-testid="stTextInput"] input:focus {
+        background-color: white !important;
+        color: #1e293b !important;
+        -webkit-text-fill-color: #1e293b !important;
+        border: 2px solid #2563eb !important;
+    }
+
+    /* 4. BOTÓN AZUL (CTA) - Forzar texto blanco puro */
+    button[kind="primary"] {
         background-color: #2563eb !important;
         color: white !important;
         border: none !important;
-        font-weight: bold !important;
-        box-shadow: none !important;
-    }
-    
-    /* Forzar el color blanco del texto del botón primario incluso al pasar el mouse */
-    .stButton>button[kind="primary"]:hover, .stButton>button[kind="primary"]:active, .stButton>button[kind="primary"]:focus {
-        color: white !important;
-        background-color: #1d4ed8 !important;
     }
 
-    /* 5. BOTONES NORMALES (Opciones de respuesta) */
-    .stButton>button {
+    /* Forzar texto blanco en el botón primario (incluso en hover/foco) */
+    button[kind="primary"] p {
+        color: white !important;
+        font-weight: bold !important;
+    }
+
+    /* 5. BOTONES DE RESPUESTAS (Opciones) */
+    button[kind="secondary"] {
+        background-color: white !important;
         color: #1e293b !important;
-        background-color: #ffffff !important;
         border: 1px solid #cbd5e1 !important;
     }
-
-    /* 6. CAJAS DE RESPUESTA (Feedback) */
-    .res-box { 
-        padding: 14px; border-radius: 10px; margin-bottom: 10px; 
-        border: 2px solid #cbd5e1; color: #1e293b !important; 
+    
+    button[kind="secondary"] p {
+        color: #1e293b !important;
     }
-    .res-correcta { background-color: #22c55e !important; color: white !important; }
-    .res-incorrecta { background-color: #ef4444 !important; color: white !important; }
+
+    /* 6. SELECTORES (Multiselect) */
+    [data-baseweb="select"] > div {
+        background-color: white !important;
+        color: #1e293b !important;
+    }
+
+    /* Estilo de la pregunta */
+    .pregunta-texto { 
+        color: #0f172a !important; 
+        font-weight: bold !important; 
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -212,5 +216,6 @@ elif s['end']:
     if st.button("🔄 Reiniciar", use_container_width=True):
         st.session_state.s = {'active': False, 'end': False, 'idx': 0, 'score': 0, 'ans': False, 'qs': [], 'choice': None}
         st.rerun()
+
 
 
