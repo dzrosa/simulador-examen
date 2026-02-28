@@ -44,4 +44,80 @@ def load_data():
     except:
         return None
 
-# --- INICIALIZACIÓN DE VARIABLES
+# --- INICIALIZACIÓN DE VARIABLES ---
+if 'examen_iniciado' not in st.session_state:
+    st.session_state.examen_iniciado = False
+    st.session_state.indice_actual = 0
+    st.session_state.aciertos = 0
+    st.session_state.respondido = False
+    st.session_state.finalizado = False
+    st.session_state.preguntas_examen = []
+    st.session_state.eleccion = None
+
+df = load_data()
+
+# --- VISTA: INICIO ---
+if not st.session_state.examen_iniciado and not st.session_state.finalizado:
+    st.title("🎓 Simulador de Examen")
+    if df is not None:
+        st.write(f"Preguntas disponibles: **{len(df)}**")
+        if st.button("🚀 COMENZAR EXAMEN", use_container_width=True, type="primary"):
+            cantidad = min(60, len(df))
+            indices = random.sample(range(len(df)), cantidad)
+            st.session_state.preguntas_examen = df.iloc[indices].to_dict('records')
+            st.session_state.examen_iniciado = True
+            st.rerun()
+
+# --- VISTA: RESULTADOS ---
+elif st.session_state.finalizado:
+    st.title("🏁 Resultados")
+    st.metric("Aciertos", f"{st.session_state.aciertos} / {len(st.session_state.preguntas_examen)}")
+    if st.button("🔄 Intentar de nuevo", use_container_width=True):
+        st.session_state.examen_iniciado = False
+        st.session_state.finalizado = False
+        st.session_state.indice_actual = 0
+        st.session_state.aciertos = 0
+        st.rerun()
+
+# --- VISTA: EXAMEN ---
+elif st.session_state.examen_iniciado:
+    total = len(st.session_state.preguntas_examen)
+    actual = st.session_state.indice_actual
+    pregunta = st.session_state.preguntas_examen[actual]
+    correcta_val = str(pregunta['Respuesta Correcta']).strip()
+    
+    st.progress((actual) / total)
+    st.write(f"Pregunta {actual + 1} de {total}")
+    st.markdown(f'<p class="pregunta-texto">{pregunta["Pregunta"]}</p>', unsafe_allow_html=True)
+    
+    opciones = [str(pregunta['A']), str(pregunta['B']), str(pregunta['C']), str(pregunta['D'])]
+    
+    if not st.session_state.respondido:
+        for idx, opcion in enumerate(opciones):
+            if st.button(opcion, key=f"op_{actual}_{idx}", use_container_width=True):
+                st.session_state.respondido = True
+                st.session_state.eleccion = opcion.strip()
+                if st.session_state.eleccion == correcta_val:
+                    st.session_state.aciertos += 1
+                st.rerun()
+    else:
+        for opcion in opciones:
+            op_limpia = opcion.strip()
+            if op_limpia == correcta_val:
+                st.markdown(f'<div class="opcion-resultado correcta">✅ {opcion}</div>', unsafe_allow_html=True)
+            elif op_limpia == st.session_state.eleccion:
+                st.markdown(f'<div class="opcion-resultado incorrecta">❌ {opcion}</div>', unsafe_allow_html=True)
+            else:
+                st.markdown(f'<div class="opcion-resultado neutral">{opcion}</div>', unsafe_allow_html=True)
+        
+        st.markdown(f'<div class="explicacion-caja"><b>💡 Explicación:</b><br>{pregunta["Explicación"]}</div>', unsafe_allow_html=True)
+        
+        if st.button("Siguiente Pregunta ➡️", use_container_width=True, type="primary"):
+            if actual + 1 < total:
+                st.session_state.indice_actual += 1
+                st.session_state.respondido = False
+                st.session_state.eleccion = None
+                st.rerun()
+            else:
+                st.session_state.finalizado = True
+                st.rerun()
