@@ -42,18 +42,18 @@ def cargar_datos():
         df_u = pd.read_csv(url_u)
         df_u.columns = [c.strip().lower() for c in df_u.columns]
         return df, df_u
-    except Exception as e:
+    except:
         return None, None
 
 df_preguntas, df_usuarios = cargar_datos()
 
-# 3. ESTILOS MEJORADOS
+# 3. ESTILOS
 st.markdown("""
     <style>
     .pregunta-texto { font-size: 1.2rem; font-weight: bold; color: #1e293b; margin-bottom: 1.5rem; }
     .res-box { padding: 14px; border-radius: 10px; margin-bottom: 10px; border: 2px solid #cbd5e1; }
-    .res-correcta { background-color: #22c55e !important; color: white !important; font-weight: bold; border-color: #16a34a !important; }
-    .res-incorrecta { background-color: #ef4444 !important; color: white !important; border-color: #dc2626 !important; }
+    .res-correcta { background-color: #22c55e !important; color: white !important; font-weight: bold; }
+    .res-incorrecta { background-color: #ef4444 !important; color: white !important; }
     .res-neutral { background-color: #f8fafc; color: #334155; }
     </style>
     """, unsafe_allow_html=True)
@@ -79,6 +79,7 @@ s = st.session_state.s
 if not s['active'] and not s['end']:
     st.title("🎓 Biología CBC Verano 2026")
     todas = st.checkbox("✅ Practicar con TODOS LOS TEMAS")
+    
     opciones_selector = [f"Clase {k}: {v}" for k, v in TEMARIO_DETALLE.items()]
     
     sel = []
@@ -89,28 +90,32 @@ if not s['active'] and not s['end']:
         if todas:
             pool_df = df_preguntas
         else:
-            nums = [item.split(":")[0].replace("Clase ", "").strip() for item in sel]
-            pool_df = df_preguntas[df_preguntas['Clase'].astype(str).isin(nums)]
+            # EXTRAER SOLO EL NÚMERO (Solución al fallo de arranque)
+            numeros_elegidos = [item.split(":")[0].replace("Clase ", "").strip() for item in sel]
+            # Filtramos asegurándonos de que ambos sean strings
+            pool_df = df_preguntas[df_preguntas['Clase'].astype(str).isin(numeros_elegidos)]
         
         if not pool_df.empty:
             pool = pool_df.to_dict('records')
             random.shuffle(pool)
             for p in pool:
-                mapa_letras = {"Opción A": p['Opción A'], "Opción B": p['Opción B'], "Opción C": p['Opción C'], "Opción D": p['Opción D']}
-                p['final_correcta'] = mapa_letras.get(p['Opción Correcta'], p['Opción Correcta'])
-                opts = [p['Opción A'], p['Opción B'], p['Opción C'], p['Opción D']]
+                mapa = {"Opción A": p['Opción A'], "Opción B": p['Opción B'], "Opción C": p['Opción C'], "Opción D": p['Opción D']}
+                p['final_correcta'] = mapa.get(p['Opción Correcta'], p['Opción Correcta'])
+                opts = [str(p['Opción A']), str(p['Opción B']), str(p['Opción C']), str(p['Opción D'])]
                 random.shuffle(opts)
                 p['lista_mezclada'] = opts
             
             s['qs'] = pool[:60]
             s['active'] = True; s['idx'] = 0; s['score'] = 0; s['ans'] = False
             st.rerun()
+        else:
+            st.error("No se encontraron preguntas para las clases seleccionadas. Revisa la columna 'Clase' en tu Excel.")
 
 # --- VISTA EXAMEN ---
 elif s['active'] and not s['end']:
     q = s['qs'][s['idx']]
     
-    # CORRECCIÓN: Quitamos la palabra "Clase" repetida
+    # SOLUCIÓN "CLASE CLASE": Solo mostramos el valor del Excel
     st.caption(f"Pregunta {s['idx']+1} de {len(s['qs'])} • {q['Clase']}")
     st.markdown(f'<p class="pregunta-texto">{q["Pregunta"]}</p>', unsafe_allow_html=True)
 
@@ -131,19 +136,17 @@ elif s['active'] and not s['end']:
             else:
                 st.markdown(f'<div class="res-box res-neutral">{opt}</div>', unsafe_allow_html=True)
         
-        st.info(f"💡 **Explicación:** {q.get('Explicación', 'Consulta tu material de estudio.')}")
+        st.info(f"💡 **Explicación:** {q.get('Explicación', 'Revisa la bibliografía oficial.')}")
         
-        # Botón Siguiente
         if st.button("Siguiente Pregunta ➡️", use_container_width=True, type="primary"):
             if s['idx'] + 1 < len(s['qs']):
                 s['idx'] += 1; s['ans'] = False; s['choice'] = None; st.rerun()
             else: s['end'] = True; st.rerun()
 
-    # BOTÓN FINALIZAR (Visible siempre durante el examen)
-    st.markdown("---")
-    if st.button("🏁 Finalizar Examen ahora", use_container_width=True):
-        s['end'] = True
-        st.rerun()
+    # BOTÓN FINALIZAR SIEMPRE VISIBLE
+    st.write("<br>"*3, unsafe_allow_html=True)
+    if st.button("🏁 FINALIZAR EXAMEN Y VER PUNTAJE", use_container_width=True):
+        s['end'] = True; st.rerun()
 
 # --- VISTA RESULTADOS ---
 elif s['end']:
@@ -151,13 +154,12 @@ elif s['end']:
     score = s['score']
     total = len(s['qs'])
     st.metric("Puntaje", f"{score} / {total}")
-    
     if score >= 36:
         st.success("¡APROBADO! 🎉")
         st.balloons()
     else:
-        st.error(f"No alcanzaste el mínimo (36/{total}). ¡A seguir practicando!")
+        st.error(f"Puntaje insuficiente (Mínimo 36/{total}).")
     
-    if st.button("🔄 Volver al Inicio", use_container_width=True):
+    if st.button("🔄 Reiniciar", use_container_width=True):
         st.session_state.s = {'active': False, 'end': False, 'idx': 0, 'score': 0, 'ans': False, 'qs': [], 'choice': None}
         st.rerun()
