@@ -49,67 +49,62 @@ def cargar_datos():
 
 df_preguntas, df_usuarios = cargar_datos()
 
-# 3. ESTILOS CSS (FORZANDO TEMA CLARO Y CONTRASTE)
+# 3. ESTILOS CSS (CORRECCIÓN TOTAL DE CONTRASTE E INPUTS)
 st.markdown("""
     <style>
-    /* Forzar fondo blanco en toda la app */
-    .stApp {
+    /* 1. Fondo general blanco y texto oscuro */
+    html, body, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
         background-color: white !important;
         color: #1e293b !important;
     }
 
-    /* Forzar color de texto en inputs y etiquetas */
-    .stMarkdown, p, span, label, .stCaption {
+    /* 2. Forzar color en todos los textos */
+    .stMarkdown, p, span, label, .stCaption, h1, h2, h3, .stSelectbox label {
         color: #1e293b !important;
     }
 
-    /* Estilo de la pregunta */
-    .pregunta-texto { 
-        font-size: 1.2rem; 
-        font-weight: bold; 
-        color: #0f172a !important; 
-        margin-bottom: 1.5rem; 
-    }
-
-    /* Cajas de respuestas */
-    .res-box { 
-        padding: 14px; 
-        border-radius: 10px; 
-        margin-bottom: 10px; 
-        border: 2px solid #cbd5e1; 
-        color: #334155 !important;
-    }
-
-    /* Colores fijos para feedback (no cambian en dark mode) */
-    .res-correcta { 
-        background-color: #22c55e !important; 
-        color: white !important; 
-        font-weight: bold; 
-        border-color: #16a34a !important; 
-    }
-    .res-incorrecta { 
-        background-color: #ef4444 !important; 
-        color: white !important; 
-        border-color: #dc2626 !important; 
-    }
-    .res-neutral { 
-        background-color: #f1f5f9 !important; 
-        color: #1e293b !important; 
-    }
-
-    /* Forzar que los botones de Streamlit se vean bien */
-    .stButton>button {
+    /* 3. INPUTS Y SELECTORES (Fondo blanco, texto negro) */
+    input[type="text"], input[type="password"], [data-baseweb="select"], [data-baseweb="popover"] {
+        background-color: white !important;
         color: #1e293b !important;
-        background-color: #f8fafc !important;
         border: 1px solid #cbd5e1 !important;
     }
     
-    /* Botón primario (Empezar/Siguiente) siempre azul con texto blanco */
-    .stButton>button[kind="primary"] {
-        color: white !important;
-        background-color: #2563eb !important;
-        border: none !important;
+    /* Corregir el texto dentro de los campos de texto al escribir */
+    input {
+        color: #1e293b !important;
+        -webkit-text-fill-color: #1e293b !important;
     }
+
+    /* 4. BOTÓN CTA (Primario: Azul con texto Blanco) */
+    .stButton>button[kind="primary"] {
+        background-color: #2563eb !important;
+        color: white !important;
+        border: none !important;
+        font-weight: bold !important;
+        box-shadow: none !important;
+    }
+    
+    /* Forzar el color blanco del texto del botón primario incluso al pasar el mouse */
+    .stButton>button[kind="primary"]:hover, .stButton>button[kind="primary"]:active, .stButton>button[kind="primary"]:focus {
+        color: white !important;
+        background-color: #1d4ed8 !important;
+    }
+
+    /* 5. BOTONES NORMALES (Opciones de respuesta) */
+    .stButton>button {
+        color: #1e293b !important;
+        background-color: #ffffff !important;
+        border: 1px solid #cbd5e1 !important;
+    }
+
+    /* 6. CAJAS DE RESPUESTA (Feedback) */
+    .res-box { 
+        padding: 14px; border-radius: 10px; margin-bottom: 10px; 
+        border: 2px solid #cbd5e1; color: #1e293b !important; 
+    }
+    .res-correcta { background-color: #22c55e !important; color: white !important; }
+    .res-incorrecta { background-color: #ef4444 !important; color: white !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -217,4 +212,5 @@ elif s['end']:
     if st.button("🔄 Reiniciar", use_container_width=True):
         st.session_state.s = {'active': False, 'end': False, 'idx': 0, 'score': 0, 'ans': False, 'qs': [], 'choice': None}
         st.rerun()
+
 
