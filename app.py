@@ -4,7 +4,32 @@ import random
 import time
 
 # Configuración inicial
-st.set_page_config(page_title="Simulador Premium - Biología", page_icon="🎓", layout="centered")
+st.set_page_config(page_title="Simulador Premium - Biología 91", page_icon="🎓", layout="centered")
+
+# --- TEMARIO COMPLETO (Extraído del PDF) ---
+TEMARIO = {
+    "1": "Características de los seres vivos y Teoría celular",
+    "2": "Estructura atómica, Agua y pH",
+    "3": "Biomoléculas: Glúcidos, Lípidos y Ácidos Nucleicos",
+    "4": "Proteínas: Estructura y Función",
+    "5": "Bioenergética, Metabolismo y Enzimas",
+    "6": "Organización celular (Procariotas y Eucariotas)",
+    "7": "Membranas celulares y Transporte",
+    "8": "Sistema de endomembranas",
+    "9": "Digestión celular y Peroxisomas",
+    "10": "Mitocondrias, Cloroplastos y Respiración Celular",
+    "11": "Fotosíntesis",
+    "12": "Citoesqueleto y Movilidad celular",
+    "13": "Núcleo y Cromatina",
+    "14": "Transcripción del ADN y ARN",
+    "15": "Traducción y Código genético",
+    "16": "Clasificación de Proteínas y Tráfico",
+    "17": "Señalización celular",
+    "18": "Ciclo celular y Control",
+    "19": "Replicación del ADN y Mutaciones",
+    "20": "Mitosis y Citocinesis",
+    "21": "Meiosis y Crossing-over"
+}
 
 # --- CARGA DE DATOS ---
 SHEET_ID = "1KR7OfGpqNm0aZMu3sHl2tqwRa_7AiTqENehNHjL82qM"
@@ -55,7 +80,7 @@ if not st.session_state.acceso_concedido:
                 st.error("Credenciales incorrectas.")
     st.stop()
 
-# --- VARIABLES DE ESTADO ---
+# --- ESTADO DEL EXAMEN ---
 if 'examen_iniciado' not in st.session_state:
     st.session_state.update({'examen_iniciado': False, 'finalizado': False, 'indice_actual': 0, 'aciertos': 0, 'respondido': False, 'preguntas_examen': [], 'inicio_tiempo': 0, 'eleccion': None})
 
@@ -63,22 +88,30 @@ if 'examen_iniciado' not in st.session_state:
 if not st.session_state.examen_iniciado and not st.session_state.finalizado:
     st.title("🚀 Panel de Estudio")
     if df_preguntas is not None:
-        lista_clases = sorted(df_preguntas['Clase'].unique().tolist())
+        # ORDENAMIENTO NUMÉRICO: Convertimos a int para ordenar y luego a str para mostrar
+        clases_num = sorted([int(c) for c in df_preguntas['Clase'].unique()])
         
-        st.markdown("### 1. Selecciona las unidades que quieres practicar:")
-        # Usamos st.pills para una selección múltiple mucho más visual
-        clases_sel = st.pills("Puedes marcar varias unidades simultáneamente:", options=lista_clases, selection_mode="multi")
+        opciones_visuales = []
+        for c in clases_num:
+            str_c = str(c)
+            tema = TEMARIO.get(str_c, "Tema General")
+            opciones_visuales.append(f"Clase {str_c}: {tema}")
         
-        if not clases_sel:
-            st.info("💡 No has seleccionado ninguna unidad. Se incluirán **todas las preguntas** del examen.")
+        st.markdown("### 1. Selecciona las unidades:")
+        seleccion_visual = st.pills("Selecciona una o varias para practicar:", options=opciones_visuales, selection_mode="multi")
+        
+        clases_finales = [s.split(":")[0].replace("Clase ", "").strip() for s in seleccion_visual]
+        
+        if not clases_finales:
+            st.info("💡 Sin selección. Practicarás todas las unidades.")
             df_f = df_preguntas
         else:
-            df_f = df_preguntas[df_preguntas['Clase'].isin(clases_sel)]
-            st.success(f"Seleccionadas: {', '.join(map(str, clases_sel))}")
+            df_f = df_preguntas[df_preguntas['Clase'].astype(str).isin(clases_finales)]
+            st.success(f"Unidades seleccionadas: {', '.join(clases_finales)}")
         
-        st.metric("Preguntas disponibles", len(df_f))
+        st.metric("Preguntas en pool", len(df_f))
         
-        if st.button("🚀 COMENZAR EXAMEN", use_container_width=True, type="primary"):
+        if st.button("🚀 COMENZAR SIMULACRO", use_container_width=True, type="primary"):
             pool = df_f.to_dict('records')
             random.shuffle(pool)
             st.session_state.preguntas_examen = pool[:60]
@@ -104,13 +137,12 @@ elif st.session_state.examen_iniciado and not st.session_state.finalizado:
     col_header, col_timer = st.columns([2, 1])
     with col_header:
         st.write(f"Pregunta **{actual + 1}** de {total}")
-        st.caption(f"Unidad: {pregunta['Clase']}")
+        st.caption(f"Unidad {pregunta['Clase']}: {TEMARIO.get(str(pregunta['Clase']), 'Tema General')}")
     with col_timer:
         st.markdown(f'<p class="timer-caja">⏳ {h:02d}:{m:02d}:{s:02d}</p>', unsafe_allow_html=True)
     
     st.progress((actual) / total)
     
-    # Botón para salir
     if st.button("🏁 Entregar examen ahora", type="secondary"):
         st.session_state.finalizado = True
         st.rerun()
