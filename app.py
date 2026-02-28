@@ -18,11 +18,10 @@ def load_all_data():
         df_p = pd.read_csv(url_p)
         df_p.columns = [c.strip() for c in df_p.columns]
         
-        # URL de Usuarios (Hoja Usuarios con columna 'email' y 'clave')
+        # URL de Usuarios (Hoja Usuarios)
         url_u = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={GID_USUARIOS}"
         df_u = pd.read_csv(url_u)
-        df_u.columns = [c.strip().lower() for c in df_u.columns] # Forzamos minúsculas en encabezados
-        
+        df_u.columns = [c.strip().lower() for c in df_u.columns]
         return df_p, df_u
     except Exception as e:
         return None, None
@@ -41,17 +40,23 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- SISTEMA DE MURO DE PAGO (LOGIN CON CLAVE) ---
+# --- SISTEMA DE LOGIN ---
 if 'acceso_concedido' not in st.session_state:
     st.session_state.acceso_concedido = False
 
 if not st.session_state.acceso_concedido:
-    st.title("🔒 Acceso Exclusivo - Biología CBC")
-    st.write("Por favor, ingresa tus credenciales de alumno registrado.")
+    st.title("🔒 Acceso Exclusivo - Biología")
+    st.write("Ingresa tus credenciales para comenzar el simulacro.")
     
     email_user = st.text_input("Correo electrónico:").lower().strip()
     clave_user = st.text_input("Clave de acceso (PIN):", type="password").strip()
     
     if st.button("Validar Credenciales", use_container_width=True, type="primary"):
         if df_usuarios is not None:
-            # Validamos que el email exista Y que la clave coinc
+            # Buscamos al usuario por email
+            user_match = df_usuarios[df_usuarios['email'] == email_user]
+            
+            if not user_match.empty:
+                # Verificamos la clave
+                clave_correcta = str(user_match.iloc[0]['clave']).strip()
+                if clave_user == clave_correcta:
