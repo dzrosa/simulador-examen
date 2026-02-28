@@ -53,7 +53,7 @@ df_preguntas, df_usuarios = load_all_data()
 st.markdown("""
     <style>
     .pregunta-texto { font-size: 20px !important; font-weight: bold; margin-bottom: 25px; color: #1e293b; }
-    .res-box { padding: 15px; border-radius: 10px; margin-bottom: 10px; border: 2px solid #e2e8f0; font-size: 16px; transition: 0.3s; }
+    .res-box { padding: 15px; border-radius: 10px; margin-bottom: 10px; border: 2px solid #e2e8f0; font-size: 16px; }
     .res-correcta { background-color: #dcfce7 !important; border-color: #22c55e !important; color: #166534 !important; font-weight: bold; }
     .res-incorrecta { background-color: #fee2e2 !important; border-color: #ef4444 !important; color: #991b1b !important; }
     .res-neutral { background-color: #f8fafc; color: #64748b; border: 1px solid #e2e8f0; }
@@ -88,26 +88,39 @@ if not s['started'] and not s['over']:
     st.title("🎯 Practicar por Unidad")
     
     lista_temas = [f"Clase {i}: {TEMARIO[str(i)]}" for i in range(1, 22)]
-    seleccion = st.multiselect("Selecciona una o varias unidades:", options=lista_temas)
+    seleccion = st.multiselect("Selecciona una o varias unidades (si dejas vacío, entran todas):", options=lista_temas)
 
     if st.button("🚀 INICIAR EXAMEN", use_container_width=True, type="primary"):
         if df_preguntas is not None:
-            if seleccion:
-                clases_ids = [sel.split(":")[0].replace("Clase ", "").strip() for sel in seleccion]
-                # Filtro exacto para evitar que "1" traiga "10"
-                df_f = df_preguntas[df_preguntas['Clase'].astype(str).isin(clases_ids)]
-            else:
-                df_f = df_preguntas
+            df_working = df_preguntas.copy()
+            # Limpiamos la columna Clase del Excel para que sea numérica
+            df_working['Clase_Num'] = pd.to_numeric(df_working['Clase'], errors='coerce').fillna(0).astype(int)
             
-            lista_p = df_f.to_dict('records')
-            random.shuffle(lista_p)
-            s['questions'] = lista_p[:60]
-            s['time'] = time.time()
-            s['started'] = True
-            st.rerun()
+            if seleccion:
+                clases_ids = [int(sel.split(":")[0].replace("Clase ", "").strip()) for sel in seleccion]
+                df_f = df_working[df_working['Clase_Num'].isin(clases_ids)]
+            else:
+                df_f = df_working
+            
+            if len(df_f) == 0:
+                st.error("❌ No se encontraron preguntas para las clases seleccionadas. Revisa la columna 'Clase' en tu Excel.")
+            else:
+                lista_p = df_f.to_dict('records')
+                random.shuffle(lista_p)
+                s['questions'] = lista_p[:60]
+                s['time'] = time.time()
+                s['started'] = True
+                s['idx'] = 0
+                s['score'] = 0
+                st.rerun()
 
 # --- VISTA 2: EXAMEN ---
 elif s['started'] and not s['over']:
+    # Seguridad: Si por algún motivo la lista está vacía, resetear
+    if not s['questions']:
+        s['started'] = False
+        st.rerun()
+
     quedan = 5400 - (time.time() - s['time'])
     if quedan <= 0: s['over'] = True; st.rerun()
     
@@ -119,8 +132,7 @@ elif s['started'] and not s['over']:
     c1, c2 = st.columns([3, 1])
     with c1:
         st.write(f"Pregunta {s['idx'] + 1} de {len(s['questions'])}")
-        cid = str(q['Clase'])
-        st.caption(f"Unidad {cid}: {TEMARIO.get(cid, 'Temario')}")
+        st.caption(f"Unidad {q.get('Clase', '?')}")
         st.progress((s['idx']) / len(s['questions']))
     with c2:
         st.markdown(f'<div class="timer">⏳ {h:02d}:{m:02d}:{sec:02d}</div>', unsafe_allow_html=True)
@@ -128,11 +140,9 @@ elif s['started'] and not s['over']:
     st.markdown("---")
     st.markdown(f'<p class="pregunta-texto">{q["Pregunta"]}</p>', unsafe_allow_html=True)
     
-    # OPCIONES (Línea corregida)
     opciones = [str(q['Opción A']), str(q['Opción B']), str(q['Opción C']), str(q['Opción D'])]
     correcta = str(q['Opción Correcta']).strip()
 
-    # MODO PREGUNTA (Sin responder)
     if not s['answered']:
         for i, opt in enumerate(opciones):
             if st.button(opt, key=f"opt_{s['idx']}_{i}", use_container_width=True):
@@ -141,8 +151,6 @@ elif s['started'] and not s['over']:
                 if s['user_choice'] == correcta:
                     s['score'] += 1
                 st.rerun()
-    
-    # MODO FEEDBACK (Respondida)
     else:
         for opt in opciones:
             opt_s = opt.strip()
@@ -153,7 +161,7 @@ elif s['started'] and not s['over']:
             else:
                 st.markdown(f'<div class="res-box res-neutral">{opt}</div>', unsafe_allow_html=True)
         
-        st.info(f"💡 **Explicación:** {q.get('Explicación', 'Consulta el material de la cátedra.')}")
+        st.info(f"💡 **Explicación:** {q.get('Explicación', 'Revisa el material de la Clase ' + str(q.get('Clase')))}")
         
         if st.button("Siguiente Pregunta ➡️", use_container_width=True, type="primary"):
             if s['idx'] + 1 < len(s['questions']):
