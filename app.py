@@ -6,7 +6,7 @@ import time
 # Configuración inicial
 st.set_page_config(page_title="Simulador Premium - Biología 91", page_icon="🎓", layout="centered")
 
-# --- TEMARIO COMPLETO (Extraído del PDF) ---
+# --- TEMARIO EXTRAÍDO DEL PDF ---
 TEMARIO = {
     "1": "Características de los seres vivos y Teoría celular",
     "2": "Estructura atómica, Agua y pH",
@@ -59,6 +59,8 @@ st.markdown("""
     .incorrecta { background-color: #f8d7da; color: #721c24; }
     .neutral { background-color: #f1f3f5; color: #6c757d; }
     .timer-caja { font-size: 22px; font-weight: bold; color: #d9534f; text-align: right; background: #fff5f5; padding: 5px 10px; border-radius: 5px; border: 1px solid #d9534f; }
+    /* Estilo para que las Pills se vean mejor en móviles */
+    div[data-testid="stPills"] button { white-space: normal !important; text-align: left !important; height: auto !important; padding: 10px !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -69,8 +71,8 @@ if 'acceso_concedido' not in st.session_state:
 if not st.session_state.acceso_concedido:
     st.title("🔒 Acceso Exclusivo")
     email_user = st.text_input("Correo electrónico:").lower().strip()
-    clave_user = st.text_input("Clave de acceso (PIN):", type="password").strip()
-    if st.button("Validar Credenciales", use_container_width=True, type="primary"):
+    clave_user = st.text_input("PIN de acceso:", type="password").strip()
+    if st.button("Ingresar", use_container_width=True, type="primary"):
         if df_usuarios is not None:
             user_match = df_usuarios[df_usuarios['email'] == email_user]
             if not user_match.empty and str(user_match.iloc[0]['clave']).strip() == clave_user:
@@ -89,49 +91,52 @@ if not st.session_state.examen_iniciado and not st.session_state.finalizado:
     st.title("🚀 Panel de Estudio")
     if df_preguntas is not None:
         
-        # --- LIMPIEZA DE CLASES PARA EL SELECTOR ---
-        raw_clases = df_preguntas['Clase'].dropna().unique()
-        clases_validas = []
-        for c in raw_clases:
-            try:
-                # Convertimos a float y luego a int por si viene como "1.0"
-                clases_validas.append(int(float(c)))
-            except:
-                continue # Ignora textos o basura
+        # Limpieza y ordenamiento numérico
+        df_preguntas['Clase_ID'] = pd.to_numeric(df_preguntas['Clase'], errors='coerce')
+        clases_num = sorted(df_preguntas['Clase_ID'].dropna().unique().astype(int))
         
-        clases_num = sorted(list(set(clases_validas)))
+        opciones_visuales = [f"Clase {c}: {TEMARIO.get(str(c), 'Tema de repaso')}" for c in clases_num]
         
-        opciones_visuales = []
-        for c in clases_num:
-            str_c = str(c)
-            tema = TEMARIO.get(str_c, "Unidad de repaso")
-            opciones_visuales.append(f"Clase {str_c}: {tema}")
+        st.markdown("### 1. Elige qué quieres estudiar hoy:")
         
-        st.markdown("### 1. Selecciona las unidades:")
-        seleccion_visual = st.pills("Selecciona una o varias para practicar:", options=opciones_visuales, selection_mode="multi")
+        # INTENTO DE PILLS CON FALLBACK (Si falla, usa multiselect automáticamente)
+        try:
+            seleccion_visual = st.pills(
+                "Selecciona una o varias unidades (se marcarán en azul):",
+                options=opciones_visuales,
+                selection_mode="multi"
+            )
+        except AttributeError:
+            # Si la versión de Streamlit es vieja y no tiene .pills, usamos esto:
+            seleccion_visual = st.multiselect(
+                "Selecciona las unidades:",
+                options=opciones_visuales
+            )
         
-        # Extraer solo el número de la selección para filtrar el DataFrame
-        clases_finales = [s.split(":")[0].replace("Clase ", "").strip() for s in seleccion_visual]
+        # Procesar selección
+        clases_finales = [s.split(":")[0].replace("Clase ", "").strip() for s in (seleccion_visual or [])]
         
         if not clases_finales:
-            st.info("💡 Sin selección. Practicarás todas las unidades.")
             df_f = df_preguntas
+            st.info("💡 No seleccionaste nada. Se incluirán **todas las clases**.")
         else:
-            # Filtro robusto: comparamos la parte entera del dato en el Excel
-            df_f = df_preguntas[df_preguntas['Clase'].astype(str).apply(lambda x: x.split('.')[0] in clases_finales)]
+            df_f = df_preguntas[df_preguntas['Clase_ID'].astype(str).str.split('.').str[0].isin(clases_finales)]
             st.success(f"Unidades seleccionadas: {', '.join(clases_finales)}")
         
         st.metric("Preguntas disponibles", len(df_f))
         
-        if st.button("🚀 COMENZAR SIMULACRO", use_container_width=True, type="primary"):
-            pool = df_f.to_dict('records')
-            random.shuffle(pool)
-            st.session_state.preguntas_examen = pool[:60]
-            st.session_state.inicio_tiempo = time.time()
-            st.session_state.examen_iniciado = True
-            st.session_state.indice_actual = 0
-            st.session_state.aciertos = 0
-            st.rerun()
+        if st.button("🚀 COMENZAR EXAMEN", use_container_width=True, type="primary"):
+            if len(df_f) > 0:
+                pool = df_f.to_dict('records')
+                random.shuffle(pool)
+                st.session_state.preguntas_examen = pool[:60]
+                st.session_state.inicio_tiempo = time.time()
+                st.session_state.examen_iniciado = True
+                st.session_state.indice_actual = 0
+                st.session_state.aciertos = 0
+                st.rerun()
+            else:
+                st.error("No hay preguntas en esta selección.")
 
 # --- VISTA 2: EXAMEN ---
 elif st.session_state.examen_iniciado and not st.session_state.finalizado:
@@ -146,13 +151,12 @@ elif st.session_state.examen_iniciado and not st.session_state.finalizado:
     total = len(st.session_state.preguntas_examen)
     pregunta = st.session_state.preguntas_examen[actual]
     
-    col_header, col_timer = st.columns([2, 1])
-    with col_header:
+    c1, c2 = st.columns([2, 1])
+    with c1:
         st.write(f"Pregunta **{actual + 1}** de {total}")
-        # Limpiamos el valor de la clase para mostrar el tema correcto
-        clase_id = str(pregunta['Clase']).split('.')[0]
-        st.caption(f"Unidad {clase_id}: {TEMARIO.get(clase_id, 'Repaso General')}")
-    with col_timer:
+        cid = str(pregunta['Clase']).split('.')[0]
+        st.caption(f"Unidad {cid}: {TEMARIO.get(cid, 'Repaso')}")
+    with c2:
         st.markdown(f'<p class="timer-caja">⏳ {h:02d}:{m:02d}:{s:02d}</p>', unsafe_allow_html=True)
     
     st.progress((actual) / total)
