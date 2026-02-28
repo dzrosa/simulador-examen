@@ -6,7 +6,7 @@ import time
 # Configuración inicial
 st.set_page_config(page_title="Simulador Biología 91", page_icon="🎓", layout="centered")
 
-# --- TEMARIO EXTRAÍDO DEL PDF ---
+# --- TEMARIO ---
 TEMARIO = {
     "1": "Características de los seres vivos y Teoría celular",
     "2": "Estructura atómica, Agua y pH",
@@ -49,19 +49,19 @@ def load_all_data():
 
 df_preguntas, df_usuarios = load_all_data()
 
-# --- ESTILOS CSS CORREGIDOS ---
+# --- ESTILOS CSS ---
 st.markdown("""
     <style>
     .pregunta-texto { font-size: 20px !important; font-weight: bold; margin-bottom: 25px; color: #1e293b; }
-    .res-box { padding: 15px; border-radius: 10px; margin-bottom: 10px; border: 2px solid #e2e8f0; font-size: 16px; }
+    .res-box { padding: 15px; border-radius: 10px; margin-bottom: 10px; border: 2px solid #e2e8f0; font-size: 16px; transition: 0.3s; }
     .res-correcta { background-color: #dcfce7 !important; border-color: #22c55e !important; color: #166534 !important; font-weight: bold; }
     .res-incorrecta { background-color: #fee2e2 !important; border-color: #ef4444 !important; color: #991b1b !important; }
-    .res-neutral { background-color: #f8fafc; color: #64748b; }
+    .res-neutral { background-color: #f8fafc; color: #64748b; border: 1px solid #e2e8f0; }
     .timer { font-size: 24px; font-weight: bold; color: #e11d48; background: #fff1f2; padding: 10px; border-radius: 8px; border: 1px solid #fda4af; text-align: center; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- ACCESO ---
+# --- SISTEMA DE ACCESO ---
 if 'auth' not in st.session_state: st.session_state.auth = False
 
 if not st.session_state.auth:
@@ -77,7 +77,7 @@ if not st.session_state.auth:
             else: st.error("Error de credenciales")
     st.stop()
 
-# --- ESTADO ---
+# --- ESTADO DEL SIMULADOR ---
 if 'state' not in st.session_state:
     st.session_state.state = {'started': False, 'over': False, 'idx': 0, 'score': 0, 'answered': False, 'questions': [], 'time': 0, 'user_choice': None}
 
@@ -85,19 +85,17 @@ s = st.session_state.state
 
 # --- VISTA 1: SELECCIÓN ---
 if not s['started'] and not s['over']:
-    st.title("🎯 Simulador de Examen")
+    st.title("🎯 Practicar por Unidad")
     
-    # Lista de temas para el selector
     lista_temas = [f"Clase {i}: {TEMARIO[str(i)]}" for i in range(1, 22)]
-    
-    st.subheader("Selecciona las unidades a evaluar:")
-    seleccion = st.multiselect("Puedes elegir varias:", options=lista_temas)
+    seleccion = st.multiselect("Selecciona una o varias unidades:", options=lista_temas)
 
     if st.button("🚀 INICIAR EXAMEN", use_container_width=True, type="primary"):
         if df_preguntas is not None:
             if seleccion:
                 clases_ids = [sel.split(":")[0].replace("Clase ", "").strip() for sel in seleccion]
-                df_f = df_preguntas[df_preguntas['Clase'].astype(str).str.startswith(tuple(clases_ids))]
+                # Filtro exacto para evitar que "1" traiga "10"
+                df_f = df_preguntas[df_preguntas['Clase'].astype(str).isin(clases_ids)]
             else:
                 df_f = df_preguntas
             
@@ -110,7 +108,6 @@ if not s['started'] and not s['over']:
 
 # --- VISTA 2: EXAMEN ---
 elif s['started'] and not s['over']:
-    # Cronómetro
     quedan = 5400 - (time.time() - s['time'])
     if quedan <= 0: s['over'] = True; st.rerun()
     
@@ -122,18 +119,20 @@ elif s['started'] and not s['over']:
     c1, c2 = st.columns([3, 1])
     with c1:
         st.write(f"Pregunta {s['idx'] + 1} de {len(s['questions'])}")
-        st.caption(f"Unidad: {q['Clase']}")
-        st.progress(s['idx'] / len(s['questions']))
+        cid = str(q['Clase'])
+        st.caption(f"Unidad {cid}: {TEMARIO.get(cid, 'Temario')}")
+        st.progress((s['idx']) / len(s['questions']))
     with c2:
         st.markdown(f'<div class="timer">⏳ {h:02d}:{m:02d}:{sec:02d}</div>', unsafe_allow_html=True)
 
     st.markdown("---")
     st.markdown(f'<p class="pregunta-texto">{q["Pregunta"]}</p>', unsafe_allow_html=True)
     
-    opciones = [str(q['Opción A']), str(q['Opción B']), str(q['Opción C']), str(p) for p in [q['Opción D']]]
+    # OPCIONES (Línea corregida)
+    opciones = [str(q['Opción A']), str(q['Opción B']), str(q['Opción C']), str(q['Opción D'])]
     correcta = str(q['Opción Correcta']).strip()
 
-    # Si NO ha respondido aún
+    # MODO PREGUNTA (Sin responder)
     if not s['answered']:
         for i, opt in enumerate(opciones):
             if st.button(opt, key=f"opt_{s['idx']}_{i}", use_container_width=True):
@@ -143,21 +142,18 @@ elif s['started'] and not s['over']:
                     s['score'] += 1
                 st.rerun()
     
-    # Si YA respondió (Mostrar VERDE y ROJO)
+    # MODO FEEDBACK (Respondida)
     else:
         for opt in opciones:
             opt_s = opt.strip()
             if opt_s == correcta:
-                # Marcado en VERDE con check
                 st.markdown(f'<div class="res-box res-correcta">✅ {opt}</div>', unsafe_allow_html=True)
             elif opt_s == s['user_choice']:
-                # Marcado en ROJO si se equivocó
                 st.markdown(f'<div class="res-box res-incorrecta">❌ {opt}</div>', unsafe_allow_html=True)
             else:
-                # El resto neutras
                 st.markdown(f'<div class="res-box res-neutral">{opt}</div>', unsafe_allow_html=True)
         
-        st.success(f"**Explicación:** {q['Explicación']}")
+        st.info(f"💡 **Explicación:** {q.get('Explicación', 'Consulta el material de la cátedra.')}")
         
         if st.button("Siguiente Pregunta ➡️", use_container_width=True, type="primary"):
             if s['idx'] + 1 < len(s['questions']):
@@ -170,8 +166,8 @@ elif s['started'] and not s['over']:
 
 # --- VISTA 3: RESULTADOS ---
 elif s['over']:
-    st.title("🏁 Examen Finalizado")
+    st.title("🏁 Resultados")
     st.metric("Puntaje Total", f"{s['score']} / {len(s['questions'])}")
-    if st.button("🔄 Volver a intentar"):
+    if st.button("🔄 Volver al Inicio"):
         st.session_state.state = {'started': False, 'over': False, 'idx': 0, 'score': 0, 'answered': False, 'questions': [], 'time': 0, 'user_choice': None}
         st.rerun()
