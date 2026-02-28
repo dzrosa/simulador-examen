@@ -4,9 +4,9 @@ import random
 import time
 
 # Configuración inicial
-st.set_page_config(page_title="Simulador Premium - Biología 91", page_icon="🎓", layout="wide")
+st.set_page_config(page_title="Simulador Biología 91", page_icon="🎓", layout="centered")
 
-# --- TEMARIO COMPLETO ---
+# --- TEMARIO (Diccionario de respaldo) ---
 TEMARIO = {
     "1": "Características de los seres vivos y Teoría celular",
     "2": "Estructura atómica, Agua y pH",
@@ -35,7 +35,7 @@ TEMARIO = {
 SHEET_ID = "1KR7OfGpqNm0aZMu3sHl2tqwRa_7AiTqENehNHjL82qM"
 GID_USUARIOS = "1819383994"
 
-@st.cache_data(ttl=10)
+@st.cache_data(ttl=15)
 def load_all_data():
     try:
         url_p = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=0"
@@ -53,158 +53,135 @@ df_preguntas, df_usuarios = load_all_data()
 # --- ESTILOS CSS ---
 st.markdown("""
     <style>
-    .pregunta-texto { font-size: 20px !important; font-weight: bold; color: #1E3A8A; margin-bottom: 20px; }
-    .opcion-resultado { padding: 15px; border-radius: 10px; margin-bottom: 10px; border: 1px solid #E5E7EB; }
-    .correcta { background-color: #D1FAE5; color: #065F46; border: 2px solid #10B981; }
-    .incorrecta { background-color: #FEE2E2; color: #991B1B; border: 2px solid #EF4444; }
-    .neutral { background-color: #F3F4F6; color: #374151; }
-    .timer-caja { font-size: 24px; font-weight: bold; color: #B91C1C; background: #FEF2F2; padding: 10px; border-radius: 10px; border: 2px solid #FECACA; text-align: center; }
+    .pregunta-texto { font-size: 19px !important; font-weight: bold; margin-bottom: 20px; color: #1f2937; }
+    .opcion-resultado { padding: 12px; border-radius: 8px; margin-bottom: 8px; border: 1px solid #d1d5db; }
+    .correcta { background-color: #d1fae5; color: #065f46; font-weight: bold; border: 1px solid #10b981; }
+    .incorrecta { background-color: #fee2e2; color: #991b1b; border: 1px solid #ef4444; }
+    .neutral { background-color: #f3f4f6; color: #4b5563; }
+    .timer-caja { font-size: 22px; font-weight: bold; color: #dc2626; text-align: right; background: #fef2f2; padding: 8px; border-radius: 8px; border: 1px solid #fecaca; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- LOGIN ---
-if 'acceso_concedido' not in st.session_state:
-    st.session_state.acceso_concedido = False
+# --- SISTEMA DE ACCESO ---
+if 'acceso' not in st.session_state: st.session_state.acceso = False
 
-if not st.session_state.acceso_concedido:
-    st.title("🔒 Acceso al Simulador")
-    col1, col2 = st.columns(2)
-    with col1:
-        email_user = st.text_input("Correo electrónico:").lower().strip()
-        clave_user = st.text_input("PIN:", type="password").strip()
-        if st.button("Ingresar", use_container_width=True, type="primary"):
-            if df_usuarios is not None:
-                user_match = df_usuarios[df_usuarios['email'] == email_user]
-                if not user_match.empty and str(user_match.iloc[0]['clave']).strip() == clave_user:
-                    st.session_state.acceso_concedido = True
-                    st.rerun()
-                else: st.error("Datos incorrectos")
+if not st.session_state.acceso:
+    st.title("🔐 Ingreso al Sistema")
+    email = st.text_input("Email:").lower().strip()
+    pin = st.text_input("PIN:", type="password").strip()
+    if st.button("Entrar", use_container_width=True, type="primary"):
+        if df_usuarios is not None:
+            match = df_usuarios[df_usuarios['email'] == email]
+            if not match.empty and str(match.iloc[0]['clave']).strip() == pin:
+                st.session_state.acceso = True
+                st.rerun()
+            else: st.error("Credenciales no válidas.")
     st.stop()
 
-# --- ESTADO ---
-if 'examen_iniciado' not in st.session_state:
-    st.session_state.update({'examen_iniciado': False, 'finalizado': False, 'indice_actual': 0, 'aciertos': 0, 'respondido': False, 'preguntas_examen': [], 'inicio_tiempo': 0, 'eleccion': None})
+# --- ESTADO DEL EXAMEN ---
+if 'ex_iniciado' not in st.session_state:
+    st.session_state.update({'ex_iniciado': False, 'fin': False, 'idx': 0, 'pts': 0, 'resp': False, 'pool': [], 't0': 0, 'sel': None})
 
-# --- VISTA 1: CONFIGURACIÓN ---
-if not st.session_state.examen_iniciado and not st.session_state.finalizado:
-    st.title("🚀 Configura tu Examen")
+# --- PANTALLA DE INICIO / SELECCIÓN ---
+if not st.session_state.ex_iniciado and not st.session_state.fin:
+    st.title("🎯 Configura tu práctica")
     
-    with st.sidebar:
-        st.header("📚 Temario")
-        st.write("Selecciona las clases:")
-        
-        # Limpieza de clases del Excel
-        df_preguntas['Clase_ID'] = pd.to_numeric(df_preguntas['Clase'], errors='coerce')
-        clases_num = sorted(df_preguntas['Clase_ID'].dropna().unique().astype(int))
-        
-        # Checkboxes dinámicos
-        clases_seleccionadas = []
-        col_btn1, col_btn2 = st.columns(2)
-        if col_btn1.button("Todos"): st.session_state.clear_all = False # Lógica simple para marcar
-        
-        for c in clases_num:
-            tema = TEMARIO.get(str(c), "Unidad de Repaso")
-            if st.checkbox(f"Clase {c}: {tema}", key=f"check_{c}"):
-                clases_seleccionadas.append(str(c))
+    # Generamos la lista de opciones para el selector
+    opciones = [f"Clase {i}: {TEMARIO[str(i)]}" for i in range(1, 22)]
     
-    # Cuerpo principal
-    st.markdown("### Resumen de selección")
-    if not clases_seleccionadas:
-        df_f = df_preguntas
-        st.warning("⚠️ No has seleccionado clases específicas. Se usará **todo el banco de preguntas**.")
-    else:
-        df_f = df_preguntas[df_preguntas['Clase_ID'].astype(str).str.split('.').str[0].isin(clases_seleccionadas)]
-        st.success(f"✅ Has seleccionado {len(clases_seleccionadas)} unidades.")
-    
-    st.metric("Preguntas totales disponibles", len(df_f))
-    
-    if st.button("🔥 COMENZAR SIMULACRO", use_container_width=True, type="primary"):
-        if len(df_f) > 0:
-            pool = df_f.to_dict('records')
-            random.shuffle(pool)
-            st.session_state.preguntas_examen = pool[:60]
-            st.session_state.inicio_tiempo = time.time()
-            st.session_state.examen_iniciado = True
-            st.session_state.indice_actual = 0
-            st.session_state.aciertos = 0
+    st.write("### 1. Elige las clases que quieres estudiar:")
+    seleccionados = st.multiselect(
+        "Haz clic abajo para elegir una o varias unidades (si no eliges nada, entran todas):",
+        options=opciones,
+        placeholder="Ej: Clase 9, Clase 11..."
+    )
+
+    # Botón para empezar
+    if st.button("🚀 EMPEZAR EXAMEN", use_container_width=True, type="primary"):
+        if df_preguntas is not None:
+            # Filtrar si hay selección
+            if seleccionados:
+                clases_ids = [s.split(":")[0].replace("Clase ", "").strip() for s in seleccionados]
+                df_f = df_preguntas[df_preguntas['Clase'].astype(str).str.contains('|'.join(clases_ids))]
+            else:
+                df_f = df_preguntas
+            
+            preguntas = df_f.to_dict('records')
+            random.shuffle(preguntas)
+            st.session_state.pool = preguntas[:60]
+            st.session_state.t0 = time.time()
+            st.session_state.ex_iniciado = True
             st.rerun()
-        else:
-            st.error("La selección no tiene preguntas.")
 
-# --- VISTA 2: EXAMEN ---
-elif st.session_state.examen_iniciado and not st.session_state.finalizado:
-    restante = 5400 - (time.time() - st.session_state.inicio_tiempo)
+# --- PANTALLA DE EXAMEN ---
+elif st.session_state.ex_iniciado and not st.session_state.fin:
+    # Tiempo
+    restante = 5400 - (time.time() - st.session_state.t0)
     if restante <= 0:
-        st.session_state.finalizado = True
+        st.session_state.fin = True
         st.rerun()
-
+    
     m, s = divmod(int(restante), 60)
     h, m = divmod(m, 60)
-    actual = st.session_state.indice_actual
-    total = len(st.session_state.preguntas_examen)
-    pregunta = st.session_state.preguntas_examen[actual]
     
-    col_izq, col_der = st.columns([3, 1])
-    with col_izq:
-        st.write(f"Pregunta **{actual + 1}** de {total}")
-        cid = str(pregunta['Clase']).split('.')[0]
-        st.caption(f"📍 {TEMARIO.get(cid, 'Unidad ' + cid)}")
-        st.progress((actual) / total)
-    with col_der:
-        st.markdown(f'<div class="timer-caja">⏳ {h:02d}:{m:02d}:{s:02d}</div>', unsafe_allow_html=True)
+    actual = st.session_state.idx
+    total = len(st.session_state.pool)
+    p = st.session_state.pool[actual]
     
-    if st.button("🏁 Finalizar ahora"):
-        st.session_state.finalizado = True
+    # Header
+    c1, c2 = st.columns([2, 1])
+    with c1:
+        st.write(f"Pregunta {actual + 1} de {total}")
+        st.caption(f"Unidad: {p['Clase']}")
+    with c2:
+        st.markdown(f'<p class="timer-caja">⏳ {h:02d}:{m:02d}:{s:02d}</p>', unsafe_allow_html=True)
+    
+    st.progress((actual) / total)
+    
+    # BOTÓN PARA FINALIZAR EN CUALQUIER MOMENTO
+    if st.button("🏁 Finalizar y ver nota ahora", type="secondary"):
+        st.session_state.fin = True
         st.rerun()
 
     st.markdown("---")
-    st.markdown(f'<p class="pregunta-texto">{pregunta["Pregunta"]}</p>', unsafe_allow_html=True)
+    st.markdown(f'<p class="pregunta-texto">{p["Pregunta"]}</p>', unsafe_allow_html=True)
     
-    opciones = [str(pregunta['Opción A']), str(pregunta['Opción B']), str(pregunta['Opción C']), str(pregunta['Opción D'])]
-    correcta_val = str(pregunta['Opción Correcta']).strip()
+    ops = [str(p['Opción A']), str(p['Opción B']), str(p['Opción C']), str(p['Opción D'])]
+    correcta = str(p['Opción Correcta']).strip()
 
-    if not st.session_state.respondido:
-        for idx, op in enumerate(opciones):
-            if st.button(op, key=f"btn_{actual}_{idx}", use_container_width=True):
-                st.session_state.eleccion = op.strip()
-                st.session_state.respondido = True
-                if st.session_state.eleccion == correcta_val:
-                    st.session_state.aciertos += 1
+    if not st.session_state.resp:
+        for i, o in enumerate(ops):
+            if st.button(o, key=f"b_{actual}_{i}", use_container_width=True):
+                st.session_state.sel = o.strip()
+                st.session_state.resp = True
+                if st.session_state.sel == correcta:
+                    st.session_state.pts += 1
                 st.rerun()
         time.sleep(1)
         st.rerun()
     else:
-        for op in opciones:
-            op_s = op.strip()
-            if op_s == correcta_val:
-                st.markdown(f'<div class="opcion-resultado correcta">✅ {op}</div>', unsafe_allow_html=True)
-            elif op_s == st.session_state.eleccion:
-                st.markdown(f'<div class="opcion-resultado incorrecta">❌ {op}</div>', unsafe_allow_html=True)
-            else:
-                st.markdown(f'<div class="opcion-resultado neutral">{op}</div>', unsafe_allow_html=True)
+        for o in ops:
+            o_s = o.strip()
+            if o_s == correcta: st.markdown(f'<div class="opcion-resultado correcta">✅ {o}</div>', unsafe_allow_html=True)
+            elif o_s == st.session_state.sel: st.markdown(f'<div class="opcion-resultado incorrecta">❌ {o}</div>', unsafe_allow_html=True)
+            else: st.markdown(f'<div class="opcion-resultado neutral">{o}</div>', unsafe_allow_html=True)
         
-        st.info(f"💡 **Explicación:** {pregunta['Explicación']}")
-        if st.button("Siguiente ➡️", use_container_width=True, type="primary"):
+        st.info(f"💡 **Explicación:** {p['Explicación']}")
+        if st.button("Siguiente Pregunta ➡️", use_container_width=True, type="primary"):
             if actual + 1 < total:
-                st.session_state.indice_actual += 1
-                st.session_state.respondido = False
+                st.session_state.idx += 1
+                st.session_state.resp = False
                 st.rerun()
             else:
-                st.session_state.finalizado = True
+                st.session_state.fin = True
                 st.rerun()
 
-# --- VISTA 3: RESULTADOS ---
-elif st.session_state.finalizado:
-    st.title("🏁 Resultados Finales")
-    total_v = st.session_state.indice_actual + (1 if st.session_state.respondido else 0)
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Aciertos", f"{st.session_state.aciertos}")
-    c2.metric("Respondidas", f"{total_v}")
-    if total_v > 0:
-        porcentaje = (st.session_state.aciertos/total_v)*100
-        c3.metric("Efectividad", f"{porcentaje:.1f}%")
-        
-    if st.button("🔄 Reiniciar Simulador", use_container_width=True):
-        st.session_state.examen_iniciado = False
-        st.session_state.finalizado = False
+# --- PANTALLA DE RESULTADOS ---
+elif st.session_state.fin:
+    st.title("🏁 Resultados")
+    respondidas = st.session_state.idx + (1 if st.session_state.resp else 0)
+    st.metric("Aciertos", f"{st.session_state.pts} / {respondidas}")
+    
+    if st.button("🔄 Reiniciar"):
+        st.session_state.update({'ex_iniciado': False, 'fin': False, 'idx': 0, 'pts': 0, 'resp': False})
         st.rerun()
