@@ -35,7 +35,7 @@ TEMARIO = {
 SHEET_ID = "1KR7OfGpqNm0aZMu3sHl2tqwRa_7AiTqENehNHjL82qM"
 GID_USUARIOS = "1819383994"
 
-@st.cache_data(ttl=30)
+@st.cache_data(ttl=20)
 def load_all_data():
     try:
         url_p = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=0"
@@ -56,14 +56,13 @@ st.markdown("""
     .res-box { padding: 15px; border-radius: 10px; margin-bottom: 10px; border: 2px solid #e2e8f0; font-size: 16px; }
     .res-correcta { background-color: #dcfce7 !important; border-color: #22c55e !important; color: #166534 !important; font-weight: bold; }
     .res-incorrecta { background-color: #fee2e2 !important; border-color: #ef4444 !important; color: #991b1b !important; }
-    .res-neutral { background-color: #f8fafc; color: #64748b; border: 1px solid #e2e8f0; }
+    .res-neutral { background-color: #f8fafc; color: #64748b; }
     .timer { font-size: 24px; font-weight: bold; color: #e11d48; background: #fff1f2; padding: 10px; border-radius: 8px; border: 1px solid #fda4af; text-align: center; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- SISTEMA DE ACCESO ---
+# --- ACCESO ---
 if 'auth' not in st.session_state: st.session_state.auth = False
-
 if not st.session_state.auth:
     st.title("🔐 Acceso")
     u = st.text_input("Email:").lower().strip()
@@ -77,7 +76,7 @@ if not st.session_state.auth:
             else: st.error("Error de credenciales")
     st.stop()
 
-# --- ESTADO DEL SIMULADOR ---
+# --- ESTADO ---
 if 'state' not in st.session_state:
     st.session_state.state = {'started': False, 'over': False, 'idx': 0, 'score': 0, 'answered': False, 'questions': [], 'time': 0, 'user_choice': None}
 
@@ -86,24 +85,26 @@ s = st.session_state.state
 # --- VISTA 1: SELECCIÓN ---
 if not s['started'] and not s['over']:
     st.title("🎯 Practicar por Unidad")
-    
     lista_temas = [f"Clase {i}: {TEMARIO[str(i)]}" for i in range(1, 22)]
-    seleccion = st.multiselect("Selecciona una o varias unidades (si dejas vacío, entran todas):", options=lista_temas)
+    seleccion = st.multiselect("Selecciona una o varias unidades:", options=lista_temas)
 
     if st.button("🚀 INICIAR EXAMEN", use_container_width=True, type="primary"):
         if df_preguntas is not None:
-            df_working = df_preguntas.copy()
-            # Limpiamos la columna Clase del Excel para que sea numérica
-            df_working['Clase_Num'] = pd.to_numeric(df_working['Clase'], errors='coerce').fillna(0).astype(int)
-            
             if seleccion:
-                clases_ids = [int(sel.split(":")[0].replace("Clase ", "").strip()) for sel in seleccion]
-                df_f = df_working[df_working['Clase_Num'].isin(clases_ids)]
+                # Extraemos solo el número (ej: "1") de la selección del usuario
+                numeros_elegidos = [sel.split(":")[0].replace("Clase ", "").strip() for sel in seleccion]
+                
+                # FILTRO INTELIGENTE: Busca si el número elegido está dentro del texto de la celda
+                # Esto sirve si en el Excel dice "CLASE 1", "Clase 01" o "1"
+                mascara = df_preguntas['Clase'].astype(str).apply(
+                    lambda x: any(num == "".join(filter(str.isdigit, x)) for num in numeros_elegidos)
+                )
+                df_f = df_preguntas[mascara]
             else:
-                df_f = df_working
+                df_f = df_preguntas
             
             if len(df_f) == 0:
-                st.error("❌ No se encontraron preguntas para las clases seleccionadas. Revisa la columna 'Clase' en tu Excel.")
+                st.error(f"❌ No encontré preguntas. En tu Excel la columna 'Clase' debe contener el número. (Elegiste: {seleccion})")
             else:
                 lista_p = df_f.to_dict('records')
                 random.shuffle(lista_p)
@@ -116,11 +117,6 @@ if not s['started'] and not s['over']:
 
 # --- VISTA 2: EXAMEN ---
 elif s['started'] and not s['over']:
-    # Seguridad: Si por algún motivo la lista está vacía, resetear
-    if not s['questions']:
-        s['started'] = False
-        st.rerun()
-
     quedan = 5400 - (time.time() - s['time'])
     if quedan <= 0: s['over'] = True; st.rerun()
     
@@ -132,7 +128,7 @@ elif s['started'] and not s['over']:
     c1, c2 = st.columns([3, 1])
     with c1:
         st.write(f"Pregunta {s['idx'] + 1} de {len(s['questions'])}")
-        st.caption(f"Unidad {q.get('Clase', '?')}")
+        st.caption(f"Unidad detectada en Excel: {q.get('Clase', '?')}")
         st.progress((s['idx']) / len(s['questions']))
     with c2:
         st.markdown(f'<div class="timer">⏳ {h:02d}:{m:02d}:{sec:02d}</div>', unsafe_allow_html=True)
@@ -161,7 +157,7 @@ elif s['started'] and not s['over']:
             else:
                 st.markdown(f'<div class="res-box res-neutral">{opt}</div>', unsafe_allow_html=True)
         
-        st.info(f"💡 **Explicación:** {q.get('Explicación', 'Revisa el material de la Clase ' + str(q.get('Clase')))}")
+        st.info(f"💡 **Explicación:** {q.get('Explicación', 'Consulta el material de estudio.')}")
         
         if st.button("Siguiente Pregunta ➡️", use_container_width=True, type="primary"):
             if s['idx'] + 1 < len(s['questions']):
