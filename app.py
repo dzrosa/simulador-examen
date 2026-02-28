@@ -41,10 +41,10 @@ st.markdown("""
     <style>
     .pregunta-texto { font-size: 18px !important; font-weight: bold; margin-bottom: 20px; }
     .opcion-resultado { padding: 12px; border-radius: 8px; margin-bottom: 8px; border: 1px solid #dee2e6; }
-    .correcta { background-color: #d4edda; color: #155724; }
+    .correcta { background-color: #d4edda; color: #155724; font-weight: bold; }
     .incorrecta { background-color: #f8d7da; color: #721c24; }
     .neutral { background-color: #f1f3f5; color: #6c757d; }
-    .timer-caja { font-size: 20px; font-weight: bold; color: #d9534f; text-align: right; }
+    .timer-caja { font-size: 22px; font-weight: bold; color: #d9534f; text-align: right; background: #fff5f5; padding: 5px 10px; border-radius: 5px; border: 1px solid #d9534f; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -54,7 +54,6 @@ if not st.session_state.examen_iniciado and not st.session_state.finalizado:
     if df is not None:
         st.write(f"Preguntas cargadas: {len(df)}")
         if st.button("🚀 COMENZAR EXAMEN", use_container_width=True, type="primary"):
-            # Lógica simplificada al máximo
             pool = df.to_dict('records')
             random.shuffle(pool)
             st.session_state.preguntas_examen = pool[:60]
@@ -64,29 +63,37 @@ if not st.session_state.examen_iniciado and not st.session_state.finalizado:
             st.session_state.aciertos = 0
             st.session_state.respondido = False
             st.rerun()
-    else:
-        st.error("Error cargando base de datos.")
 
 # --- VISTA 2: EXAMEN ---
 elif st.session_state.examen_iniciado and not st.session_state.finalizado:
-    # Tiempo
-    restante = 5400 - (time.time() - st.session_state.inicio_tiempo)
+    # --- CÁLCULO DE TIEMPO ---
+    tiempo_total = 5400 # 90 minutos
+    transcurrido = time.time() - st.session_state.inicio_tiempo
+    restante = tiempo_total - transcurrido
+
     if restante <= 0:
         st.session_state.finalizado = True
         st.rerun()
 
+    # Formato HH:MM:SS
     m, s = divmod(int(restante), 60)
     h, m = divmod(m, 60)
     
+    # --- HEADER ---
     actual = st.session_state.indice_actual
     total = len(st.session_state.preguntas_examen)
-    pregunta = st.session_state.preguntas_examen[actual]
     
-    c1, c2 = st.columns([3, 1])
-    with c1: st.write(f"Pregunta {actual + 1} de {total}")
-    with c2: st.markdown(f'<p class="timer-caja">⏳ {h:02d}:{m:02d}:{s:02d}</p>', unsafe_allow_html=True)
+    c1, c2 = st.columns([2, 1])
+    with c1: 
+        st.write(f"Pregunta {actual + 1} de {total}")
+    with c2: 
+        # Mostramos el tiempo
+        st.markdown(f'<p class="timer-caja">⏳ {h:02d}:{m:02d}:{s:02d}</p>', unsafe_allow_html=True)
     
     st.progress(actual / total)
+
+    # --- MOSTRAR PREGUNTA ---
+    pregunta = st.session_state.preguntas_examen[actual]
     st.markdown(f'<p class="pregunta-texto">{pregunta["Pregunta"]}</p>', unsafe_allow_html=True)
     
     opciones = [str(pregunta['A']), str(pregunta['B']), str(pregunta['C']), str(pregunta['D'])]
@@ -100,7 +107,14 @@ elif st.session_state.examen_iniciado and not st.session_state.finalizado:
                 if st.session_state.eleccion == correcta_val:
                     st.session_state.aciertos += 1
                 st.rerun()
+        
+        # --- TRUCO PARA AUTO-REFRESCO ---
+        # Si no ha respondido, esperamos 1 segundo y refrescamos para que el reloj se mueva
+        time.sleep(1)
+        st.rerun()
+        
     else:
+        # Respuestas reveladas
         for op in opciones:
             op_s = op.strip()
             if op_s == correcta_val:
