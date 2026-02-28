@@ -10,7 +10,7 @@ st.markdown("""
     .block-container { padding-top: 1.5rem; }
     .pregunta-texto { font-size: 18px !important; font-weight: 600; margin-bottom: 15px; line-height: 1.3; }
     
-    /* Estilos de las tarjetas de respuesta reveladas */
+    /* Tarjetas de respuesta reveladas */
     .opcion-resultado {
         padding: 12px;
         border-radius: 8px;
@@ -58,15 +58,9 @@ def load_data():
         data = pd.read_csv(CSV_URL)
         data.columns = [c.strip() for c in data.columns]
         return data
-    except: return None
+    except:
+        return None
 
+# --- INICIALIZACIÓN ---
 if 'examen_iniciado' not in st.session_state:
-    st.session_state.update({'examen_iniciado': False, 'indice_actual': 0, 'aciertos': 0, 'respondido': False, 'finalizado': False, 'preguntas_examen': [], 'eleccion': None})
-
-df = load_data()
-
-# --- VISTA: INICIO ---
-if not st.session_state.examen_iniciado and not st.session_state.finalizado:
-    st.title("🎓 Simulador de Examen")
-    if st.button("🚀 COMENZAR EXAMEN", use_container_width=True, type="primary"):
-        indices = random.sample(range(len(df)), min(
+    st.session_state.update({
