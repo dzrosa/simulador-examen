@@ -4,7 +4,7 @@ import random
 import time
 
 # Configuración inicial
-st.set_page_config(page_title="Simulador Biología 91", page_icon="🎓", layout="centered")
+st.set_page_config(page_title="Simulador B91", page_icon="🎓", layout="centered")
 
 # --- TEMARIO ---
 TEMARIO = {
@@ -35,7 +35,7 @@ TEMARIO = {
 SHEET_ID = "1KR7OfGpqNm0aZMu3sHl2tqwRa_7AiTqENehNHjL82qM"
 GID_USUARIOS = "1819383994"
 
-@st.cache_data(ttl=20)
+@st.cache_data(ttl=60)
 def load_all_data():
     try:
         url_p = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=0"
@@ -49,15 +49,16 @@ def load_all_data():
 
 df_preguntas, df_usuarios = load_all_data()
 
-# --- ESTILOS CSS ---
+# --- ESTILOS CSS (MÁS COMPACTO) ---
 st.markdown("""
     <style>
-    .pregunta-texto { font-size: 20px !important; font-weight: bold; margin-bottom: 25px; color: #1e293b; }
-    .res-box { padding: 15px; border-radius: 10px; margin-bottom: 10px; border: 2px solid #e2e8f0; font-size: 16px; }
+    .main .block-container { padding-top: 2rem; }
+    .pregunta-texto { font-size: 1.2rem !important; font-weight: bold; margin-bottom: 1rem; color: #1e293b; line-height: 1.4; }
+    .res-box { padding: 10px 15px; border-radius: 8px; margin-bottom: 8px; border: 2px solid #e2e8f0; }
     .res-correcta { background-color: #dcfce7 !important; border-color: #22c55e !important; color: #166534 !important; font-weight: bold; }
     .res-incorrecta { background-color: #fee2e2 !important; border-color: #ef4444 !important; color: #991b1b !important; }
     .res-neutral { background-color: #f8fafc; color: #64748b; }
-    .timer { font-size: 24px; font-weight: bold; color: #e11d48; background: #fff1f2; padding: 10px; border-radius: 8px; border: 1px solid #fda4af; text-align: center; }
+    .timer-mini { font-size: 18px; font-weight: bold; color: #e11d48; text-align: right; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -86,16 +87,12 @@ s = st.session_state.state
 if not s['started'] and not s['over']:
     st.title("🎯 Practicar por Unidad")
     lista_temas = [f"Clase {i}: {TEMARIO[str(i)]}" for i in range(1, 22)]
-    seleccion = st.multiselect("Selecciona una o varias unidades:", options=lista_temas)
+    seleccion = st.multiselect("Elige unidades:", options=lista_temas)
 
     if st.button("🚀 INICIAR EXAMEN", use_container_width=True, type="primary"):
         if df_preguntas is not None:
             if seleccion:
-                # Extraemos solo el número (ej: "1") de la selección del usuario
                 numeros_elegidos = [sel.split(":")[0].replace("Clase ", "").strip() for sel in seleccion]
-                
-                # FILTRO INTELIGENTE: Busca si el número elegido está dentro del texto de la celda
-                # Esto sirve si en el Excel dice "CLASE 1", "Clase 01" o "1"
                 mascara = df_preguntas['Clase'].astype(str).apply(
                     lambda x: any(num == "".join(filter(str.isdigit, x)) for num in numeros_elegidos)
                 )
@@ -103,17 +100,13 @@ if not s['started'] and not s['over']:
             else:
                 df_f = df_preguntas
             
-            if len(df_f) == 0:
-                st.error(f"❌ No encontré preguntas. En tu Excel la columna 'Clase' debe contener el número. (Elegiste: {seleccion})")
-            else:
+            if not df_f.empty:
                 lista_p = df_f.to_dict('records')
                 random.shuffle(lista_p)
-                s['questions'] = lista_p[:60]
-                s['time'] = time.time()
-                s['started'] = True
-                s['idx'] = 0
-                s['score'] = 0
+                s.update({'questions': lista_p[:60], 'time': time.time(), 'started': True, 'idx': 0, 'score': 0})
                 st.rerun()
+            else:
+                st.error("No hay preguntas para esta selección.")
 
 # --- VISTA 2: EXAMEN ---
 elif s['started'] and not s['over']:
@@ -121,19 +114,13 @@ elif s['started'] and not s['over']:
     if quedan <= 0: s['over'] = True; st.rerun()
     
     m, sec = divmod(int(quedan), 60)
-    h, m = divmod(m, 60)
-    
     q = s['questions'][s['idx']]
     
-    c1, c2 = st.columns([3, 1])
-    with c1:
-        st.write(f"Pregunta {s['idx'] + 1} de {len(s['questions'])}")
-        st.caption(f"Unidad detectada en Excel: {q.get('Clase', '?')}")
-        st.progress((s['idx']) / len(s['questions']))
-    with c2:
-        st.markdown(f'<div class="timer">⏳ {h:02d}:{m:02d}:{sec:02d}</div>', unsafe_allow_html=True)
+    # Cabecera ultra compacta
+    col1, col2 = st.columns([1, 1])
+    col1.caption(f"Pregunta {s['idx']+1}/{len(s['questions'])} • Unidad {q.get('Clase','?')}")
+    col2.markdown(f'<p class="timer-mini">⏳ {m:02d}:{sec:02d}</p>', unsafe_allow_html=True)
 
-    st.markdown("---")
     st.markdown(f'<p class="pregunta-texto">{q["Pregunta"]}</p>', unsafe_allow_html=True)
     
     opciones = [str(q['Opción A']), str(q['Opción B']), str(q['Opción C']), str(q['Opción D'])]
@@ -141,18 +128,19 @@ elif s['started'] and not s['over']:
 
     if not s['answered']:
         for i, opt in enumerate(opciones):
-            if st.button(opt, key=f"opt_{s['idx']}_{i}", use_container_width=True):
+            if st.button(opt, key=f"btn_{s['idx']}_{i}", use_container_width=True):
                 s['user_choice'] = opt.strip()
                 s['answered'] = True
                 if s['user_choice'] == correcta:
                     s['score'] += 1
                 st.rerun()
     else:
+        # FEEDBACK VISUAL MEJORADO
         for opt in opciones:
             opt_s = opt.strip()
             if opt_s == correcta:
                 st.markdown(f'<div class="res-box res-correcta">✅ {opt}</div>', unsafe_allow_html=True)
-            elif opt_s == s['user_choice']:
+            elif opt_s == s['user_choice'] and opt_s != correcta:
                 st.markdown(f'<div class="res-box res-incorrecta">❌ {opt}</div>', unsafe_allow_html=True)
             else:
                 st.markdown(f'<div class="res-box res-neutral">{opt}</div>', unsafe_allow_html=True)
@@ -168,10 +156,16 @@ elif s['started'] and not s['over']:
                 s['over'] = True
                 st.rerun()
 
+    # Botón finalizar al fondo
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    if st.button("🏁 Finalizar Examen", type="secondary", use_container_width=True):
+        s['over'] = True
+        st.rerun()
+
 # --- VISTA 3: RESULTADOS ---
 elif s['over']:
     st.title("🏁 Resultados")
-    st.metric("Puntaje Total", f"{s['score']} / {len(s['questions'])}")
-    if st.button("🔄 Volver al Inicio"):
+    st.metric("Puntaje", f"{s['score']} / {len(s['questions'])}")
+    if st.button("🔄 Volver al Inicio", use_container_width=True):
         st.session_state.state = {'started': False, 'over': False, 'idx': 0, 'score': 0, 'answered': False, 'questions': [], 'time': 0, 'user_choice': None}
         st.rerun()
