@@ -10,18 +10,6 @@ st.set_page_config(page_title="Simulador Premium - Biología", page_icon="🎓",
 SHEET_ID = "1KR7OfGpqNm0aZMu3sHl2tqwRa_7AiTqENehNHjL82qM"
 GID_USUARIOS = "1819383994"
 
-# Diccionario de temas extraídos del PDF [cite: 115-148]
-TEMARIO = {
-    "1": "Características de los seres vivos y Teoría celular",
-    "2": "Estructura atómica, Uniones químicas y Agua",
-    "3": "Biomoléculas orgánicas (Glúcidos, Lípidos, Ácidos Nucleicos)",
-    "4": "Proteínas: Estructura y Función",
-    "5": "Bioenergética, Metabolismo y Enzimas",
-    "6": "Organización celular (Procariotas y Eucariotas)",
-    "7": "Membranas celulares y Transporte",
-    "8": "Sistema de endomembranas"
-}
-
 @st.cache_data(ttl=10)
 def load_all_data():
     try:
@@ -75,30 +63,20 @@ if 'examen_iniciado' not in st.session_state:
 if not st.session_state.examen_iniciado and not st.session_state.finalizado:
     st.title("🚀 Panel de Estudio")
     if df_preguntas is not None:
-        # Creamos la lista amigable: "Clase X: Tema"
-        opciones_visuales = []
-        clases_en_excel = sorted(df_preguntas['Clase'].unique().tolist())
-        
-        for c in clases_en_excel:
-            nombre_clase = str(c)
-            tema = TEMARIO.get(nombre_clase, "Tema General")
-            opciones_visuales.append(f"Clase {nombre_clase}: {tema}")
+        lista_clases = sorted(df_preguntas['Clase'].unique().tolist())
         
         st.markdown("### 1. Selecciona las unidades que quieres practicar:")
-        seleccion_visual = st.pills("Unidades disponibles:", options=opciones_visuales, selection_mode="multi")
+        # Usamos st.pills para una selección múltiple mucho más visual
+        clases_sel = st.pills("Puedes marcar varias unidades simultáneamente:", options=lista_clases, selection_mode="multi")
         
-        # Traducimos la selección visual de vuelta a los números de clase del Excel
-        clases_finales = [s.split(":")[0].replace("Clase ", "").strip() for s in seleccion_visual]
-        
-        if not clases_finales:
-            st.info("💡 No hay selección. Se incluirán todas las unidades.")
+        if not clases_sel:
+            st.info("💡 No has seleccionado ninguna unidad. Se incluirán **todas las preguntas** del examen.")
             df_f = df_preguntas
         else:
-            # Aseguramos que el tipo de dato coincida con el Excel (int o str)
-            df_f = df_preguntas[df_preguntas['Clase'].astype(str).isin(clases_finales)]
-            st.success(f"Cargando preguntas de las unidades: {', '.join(clases_finales)}")
+            df_f = df_preguntas[df_preguntas['Clase'].isin(clases_sel)]
+            st.success(f"Seleccionadas: {', '.join(map(str, clases_sel))}")
         
-        st.metric("Preguntas en este simulacro", len(df_f))
+        st.metric("Preguntas disponibles", len(df_f))
         
         if st.button("🚀 COMENZAR EXAMEN", use_container_width=True, type="primary"):
             pool = df_f.to_dict('records')
@@ -126,13 +104,13 @@ elif st.session_state.examen_iniciado and not st.session_state.finalizado:
     col_header, col_timer = st.columns([2, 1])
     with col_header:
         st.write(f"Pregunta **{actual + 1}** de {total}")
-        tema_actual = TEMARIO.get(str(pregunta['Clase']), "Tema General")
-        st.caption(f"Unidad {pregunta['Clase']}: {tema_actual}")
+        st.caption(f"Unidad: {pregunta['Clase']}")
     with col_timer:
         st.markdown(f'<p class="timer-caja">⏳ {h:02d}:{m:02d}:{s:02d}</p>', unsafe_allow_html=True)
     
     st.progress((actual) / total)
     
+    # Botón para salir
     if st.button("🏁 Entregar examen ahora", type="secondary"):
         st.session_state.finalizado = True
         st.rerun()
