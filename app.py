@@ -49,65 +49,61 @@ def cargar_datos():
 
 df_preguntas, df_usuarios = cargar_datos()
 
-# 3. ESTILOS CSS (ULTRA-CONTRASTE PARA INPUTS Y BOTONES)
+# 3. ESTILOS CSS (ESTRUCTURA LIMPIA Y CONTRASTE)
 st.markdown("""
     <style>
-    /* 1. Fondo general y textos */
-    html, body, [data-testid="stAppViewContainer"] {
+    /* 1. FORZAR TEMA CLARO EN EL CONTENEDOR PRINCIPAL */
+    .stApp {
         background-color: white !important;
+    }
+
+    /* 2. TEXTOS GENERALES (Preguntas, Explicaciones, Etiquetas) */
+    /* Usamos un color grafito oscuro para máxima legibilidad */
+    .stMarkdown, p, span, label, .stCaption, h1, h2, h3 {
         color: #1e293b !important;
     }
 
-    /* 2. INPUTS (Email y PIN) - Forzar fondo blanco y texto negro siempre */
-    [data-testid="stTextInput"] input {
-        background-color: white !important;
+    /* 3. INPUTS DE LOGIN (Email y PIN) */
+    /* Forzamos fondo blanco y texto oscuro incluso al escribir */
+    div[data-testid="stTextInput"] input {
+        background-color: #ffffff !important;
         color: #1e293b !important;
         -webkit-text-fill-color: #1e293b !important;
         border: 1px solid #cbd5e1 !important;
     }
 
-    /* 3. INPUTS CUANDO SE HACER CLIC (Focus) */
-    [data-testid="stTextInput"] input:focus {
-        background-color: white !important;
-        color: #1e293b !important;
-        -webkit-text-fill-color: #1e293b !important;
-        border: 2px solid #2563eb !important;
-    }
-
-    /* 4. BOTÓN AZUL (CTA) - Forzar texto blanco puro */
+    /* 4. BOTÓN AZUL (Siguiente / Empezar / Entrar) */
+    /* Forzamos fondo azul y texto blanco brillante */
     button[kind="primary"] {
         background-color: #2563eb !important;
-        color: white !important;
         border: none !important;
     }
-
-    /* Forzar texto blanco en el botón primario (incluso en hover/foco) */
-    button[kind="primary"] p {
+    button[kind="primary"] div, button[kind="primary"] p {
         color: white !important;
         font-weight: bold !important;
     }
 
-    /* 5. BOTONES DE RESPUESTAS (Opciones) */
+    /* 5. BOTONES DE OPCIONES (Respuestas A, B, C, D) */
     button[kind="secondary"] {
-        background-color: white !important;
-        color: #1e293b !important;
+        background-color: #f8fafc !important;
         border: 1px solid #cbd5e1 !important;
     }
-    
-    button[kind="secondary"] p {
+    button[kind="secondary"] div, button[kind="secondary"] p {
         color: #1e293b !important;
     }
 
-    /* 6. SELECTORES (Multiselect) */
-    [data-baseweb="select"] > div {
+    /* 6. CAJAS DE FEEDBACK (Correcta/Incorrecta) */
+    .res-box { 
+        padding: 14px; border-radius: 10px; margin-bottom: 10px; 
+        border: 2px solid #cbd5e1; 
+    }
+    .res-correcta { background-color: #22c55e !important; color: white !important; }
+    .res-incorrecta { background-color: #ef4444 !important; color: white !important; }
+    
+    /* 7. SELECTOR DE TEMAS (Multiselect) */
+    div[data-baseweb="select"] > div {
         background-color: white !important;
         color: #1e293b !important;
-    }
-
-    /* Estilo de la pregunta */
-    .pregunta-texto { 
-        color: #0f172a !important; 
-        font-weight: bold !important; 
     }
     </style>
     """, unsafe_allow_html=True)
@@ -216,6 +212,7 @@ elif s['end']:
     if st.button("🔄 Reiniciar", use_container_width=True):
         st.session_state.s = {'active': False, 'end': False, 'idx': 0, 'score': 0, 'ans': False, 'qs': [], 'choice': None}
         st.rerun()
+
 
 
 
