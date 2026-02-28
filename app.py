@@ -34,6 +34,7 @@ st.markdown("""
     .incorrecta { background-color: #f8d7da; color: #721c24; }
     .neutral { background-color: #f1f3f5; color: #6c757d; }
     .timer-caja { font-size: 22px; font-weight: bold; color: #d9534f; text-align: right; background: #fff5f5; padding: 5px 10px; border-radius: 5px; border: 1px solid #d9534f; }
+    .stMultiSelect div div div div { background-color: #e1f5fe; } /* Color para las "pills" de selección */
     </style>
     """, unsafe_allow_html=True)
 
@@ -62,7 +63,7 @@ if not st.session_state.acceso_concedido:
             st.error("Error al conectar con la base de datos.")
     st.stop()
 
-# --- INICIALIZACIÓN DE VARIABLES DEL EXAMEN ---
+# --- INICIALIZACIÓN DE VARIABLES ---
 if 'examen_iniciado' not in st.session_state:
     st.session_state.examen_iniciado = False
     st.session_state.finalizado = False
@@ -73,38 +74,70 @@ if 'examen_iniciado' not in st.session_state:
     st.session_state.inicio_tiempo = 0
     st.session_state.eleccion = None
 
-# --- VISTAS DEL EXAMEN ---
+# --- VISTA 1: CONFIGURACIÓN ---
 if not st.session_state.examen_iniciado and not st.session_state.finalizado:
     st.title("🚀 Prepárate para el examen")
     if df_preguntas is not None:
         lista_clases = sorted(df_preguntas['Clase'].unique().tolist())
-        clase_sel = st.selectbox("Selecciona tu unidad de estudio:", ["Todas las Clases"] + lista_clases)
-        df_f = df_preguntas if clase_sel == "Todas las Clases" else df_preguntas[df_preguntas['Clase'] == clase_sel]
+        
+        st.write("Selecciona una o varias clases para filtrar (deja vacío para estudiar todo):")
+        clases_sel = st.multiselect("Unidades de estudio:", options=lista_clases, placeholder="Todas las Clases")
+        
+        # Lógica de filtrado múltiple
+        if not clases_sel:
+            df_f = df_preguntas
+        else:
+            df_f = df_preguntas[df_preguntas['Clase'].isin(clases_sel)]
+        
+        st.info(f"Preguntas encontradas para tu selección: **{len(df_f)}**")
+        
         if st.button("COMENZAR SIMULACRO", use_container_width=True, type="primary"):
             pool = df_f.to_dict('records')
             random.shuffle(pool)
+            # Toma 60 preguntas o el total disponible si es menor a 60
             st.session_state.preguntas_examen = pool[:60]
             st.session_state.inicio_tiempo = time.time()
             st.session_state.examen_iniciado = True
+            st.session_state.indice_actual = 0
+            st.session_state.aciertos = 0
+            st.session_state.respondido = False
             st.rerun()
 
+# --- VISTA 2: EXAMEN EN CURSO ---
 elif st.session_state.examen_iniciado and not st.session_state.finalizado:
+    # Tiempo: 1h 30min
     restante = 5400 - (time.time() - st.session_state.inicio_tiempo)
     if restante <= 0:
         st.session_state.finalizado = True
         st.rerun()
+
     m, s = divmod(int(restante), 60)
     h, m = divmod(m, 60)
     actual = st.session_state.indice_actual
     total = len(st.session_state.preguntas_examen)
     pregunta = st.session_state.preguntas_examen[actual]
+    
+    # Barra Superior (Header)
     c1, c2 = st.columns([2, 1])
-    with c1: st.write(f"Pregunta {actual + 1} de {total}")
-    with c2: st.markdown(f'<p class="timer-caja">⏳ {h:02d}:{m:02d}:{s:02d}</p>', unsafe_allow_html=True)
-    st.progress(actual / total)
+    with c1: 
+        st.write(f"Pregunta {actual + 1} de {total}")
+        st.caption(f"Unidad: {pregunta['Clase']}")
+    with c2: 
+        st.markdown(f'<p class="timer-caja">⏳ {h:02d}:{m:02d}:{s:02d}</p>', unsafe_allow_html=True)
+    
+    st.progress((actual) / total)
+    
+    # Botón de Finalización Temprana (en el lateral o arriba)
+    if st.button("🏁 Finalizar y ver nota ahora", key="exit_btn", help="Termina el examen con las preguntas que llevas respondidas"):
+        st.session_state.finalizado = True
+        st.rerun()
+
+    st.markdown("---")
     st.markdown(f'<p class="pregunta-texto">{pregunta["Pregunta"]}</p>', unsafe_allow_html=True)
+    
     opciones = [str(pregunta['Opción A']), str(pregunta['Opción B']), str(pregunta['Opción C']), str(pregunta['Opción D'])]
     correcta_val = str(pregunta['Opción Correcta']).strip()
+
     if not st.session_state.respondido:
         for idx, op in enumerate(opciones):
             if st.button(op, key=f"q_{actual}_{idx}", use_container_width=True):
@@ -113,15 +146,21 @@ elif st.session_state.examen_iniciado and not st.session_state.finalizado:
                 if st.session_state.eleccion == correcta_val:
                     st.session_state.aciertos += 1
                 st.rerun()
+        # Refresco para el reloj
         time.sleep(1)
         st.rerun()
     else:
         for op in opciones:
             op_s = op.strip()
-            if op_s == correcta_val: st.markdown(f'<div class="opcion-resultado correcta">✅ {op}</div>', unsafe_allow_html=True)
-            elif op_s == st.session_state.eleccion: st.markdown(f'<div class="opcion-resultado incorrecta">❌ {op}</div>', unsafe_allow_html=True)
-            else: st.markdown(f'<div class="opcion-resultado neutral">{op}</div>', unsafe_allow_html=True)
+            if op_s == correcta_val: 
+                st.markdown(f'<div class="opcion-resultado correcta">✅ {op}</div>', unsafe_allow_html=True)
+            elif op_s == st.session_state.eleccion: 
+                st.markdown(f'<div class="opcion-resultado incorrecta">❌ {op}</div>', unsafe_allow_html=True)
+            else: 
+                st.markdown(f'<div class="opcion-resultado neutral">{op}</div>', unsafe_allow_html=True)
+        
         st.info(f"💡 **Explicación:** {pregunta['Explicación']}")
+        
         if st.button("Siguiente Pregunta ➡️", use_container_width=True, type="primary"):
             if actual + 1 < total:
                 st.session_state.indice_actual += 1
@@ -131,10 +170,21 @@ elif st.session_state.examen_iniciado and not st.session_state.finalizado:
                 st.session_state.finalizado = True
                 st.rerun()
 
+# --- VISTA 3: RESULTADOS ---
 elif st.session_state.finalizado:
     st.title("🏁 Resultados Finales")
-    st.metric("Aciertos", f"{st.session_state.aciertos} / {len(st.session_state.preguntas_examen)}")
-    if st.button("🔄 Volver al Inicio"):
+    total_respondidas = st.session_state.indice_actual + (1 if st.session_state.respondido else 0)
+    st.metric("Aciertos", f"{st.session_state.aciertos} / {total_respondidas}")
+    
+    if total_respondidas > 0:
+        porcentaje = (st.session_state.aciertos / total_respondidas) * 100
+        st.write(f"Tu porcentaje de efectividad es del **{porcentaje:.1f}%**")
+    
+    if st.button("🔄 Volver al Inicio / Otro Examen"):
+        # Reset total del estado del examen
         st.session_state.examen_iniciado = False
         st.session_state.finalizado = False
+        st.session_state.indice_actual = 0
+        st.session_state.aciertos = 0
+        st.session_state.respondido = False
         st.rerun()
