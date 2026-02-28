@@ -34,7 +34,6 @@ st.markdown("""
     .incorrecta { background-color: #f8d7da; color: #721c24; }
     .neutral { background-color: #f1f3f5; color: #6c757d; }
     .timer-caja { font-size: 22px; font-weight: bold; color: #d9534f; text-align: right; background: #fff5f5; padding: 5px 10px; border-radius: 5px; border: 1px solid #d9534f; }
-    .stMultiSelect div div div div { background-color: #e1f5fe; } /* Color para las "pills" de selección */
     </style>
     """, unsafe_allow_html=True)
 
@@ -43,69 +42,54 @@ if 'acceso_concedido' not in st.session_state:
     st.session_state.acceso_concedido = False
 
 if not st.session_state.acceso_concedido:
-    st.title("🔒 Acceso Exclusivo - Biología")
-    st.write("Ingresa tus credenciales para comenzar el simulacro.")
+    st.title("🔒 Acceso Exclusivo")
     email_user = st.text_input("Correo electrónico:").lower().strip()
     clave_user = st.text_input("Clave de acceso (PIN):", type="password").strip()
     if st.button("Validar Credenciales", use_container_width=True, type="primary"):
         if df_usuarios is not None:
             user_match = df_usuarios[df_usuarios['email'] == email_user]
-            if not user_match.empty:
-                clave_correcta = str(user_match.iloc[0]['clave']).strip()
-                if clave_user == clave_correcta:
-                    st.session_state.acceso_concedido = True
-                    st.rerun()
-                else:
-                    st.error("La clave ingresada es incorrecta.")
+            if not user_match.empty and str(user_match.iloc[0]['clave']).strip() == clave_user:
+                st.session_state.acceso_concedido = True
+                st.rerun()
             else:
-                st.error("El correo no se encuentra registrado.")
-        else:
-            st.error("Error al conectar con la base de datos.")
+                st.error("Credenciales incorrectas.")
     st.stop()
 
-# --- INICIALIZACIÓN DE VARIABLES ---
+# --- VARIABLES DE ESTADO ---
 if 'examen_iniciado' not in st.session_state:
-    st.session_state.examen_iniciado = False
-    st.session_state.finalizado = False
-    st.session_state.indice_actual = 0
-    st.session_state.aciertos = 0
-    st.session_state.respondido = False
-    st.session_state.preguntas_examen = []
-    st.session_state.inicio_tiempo = 0
-    st.session_state.eleccion = None
+    st.session_state.update({'examen_iniciado': False, 'finalizado': False, 'indice_actual': 0, 'aciertos': 0, 'respondido': False, 'preguntas_examen': [], 'inicio_tiempo': 0, 'eleccion': None})
 
 # --- VISTA 1: CONFIGURACIÓN ---
 if not st.session_state.examen_iniciado and not st.session_state.finalizado:
-    st.title("🚀 Prepárate para el examen")
+    st.title("🚀 Panel de Estudio")
     if df_preguntas is not None:
         lista_clases = sorted(df_preguntas['Clase'].unique().tolist())
         
-        st.write("Selecciona una o varias clases para filtrar (deja vacío para estudiar todo):")
-        clases_sel = st.multiselect("Unidades de estudio:", options=lista_clases, placeholder="Todas las Clases")
+        st.markdown("### 1. Selecciona las unidades que quieres practicar:")
+        # Usamos st.pills para una selección múltiple mucho más visual
+        clases_sel = st.pills("Puedes marcar varias unidades simultáneamente:", options=lista_clases, selection_mode="multi")
         
-        # Lógica de filtrado múltiple
         if not clases_sel:
+            st.info("💡 No has seleccionado ninguna unidad. Se incluirán **todas las preguntas** del examen.")
             df_f = df_preguntas
         else:
             df_f = df_preguntas[df_preguntas['Clase'].isin(clases_sel)]
+            st.success(f"Seleccionadas: {', '.join(map(str, clases_sel))}")
         
-        st.info(f"Preguntas encontradas para tu selección: **{len(df_f)}**")
+        st.metric("Preguntas disponibles", len(df_f))
         
-        if st.button("COMENZAR SIMULACRO", use_container_width=True, type="primary"):
+        if st.button("🚀 COMENZAR EXAMEN", use_container_width=True, type="primary"):
             pool = df_f.to_dict('records')
             random.shuffle(pool)
-            # Toma 60 preguntas o el total disponible si es menor a 60
             st.session_state.preguntas_examen = pool[:60]
             st.session_state.inicio_tiempo = time.time()
             st.session_state.examen_iniciado = True
             st.session_state.indice_actual = 0
             st.session_state.aciertos = 0
-            st.session_state.respondido = False
             st.rerun()
 
-# --- VISTA 2: EXAMEN EN CURSO ---
+# --- VISTA 2: EXAMEN ---
 elif st.session_state.examen_iniciado and not st.session_state.finalizado:
-    # Tiempo: 1h 30min
     restante = 5400 - (time.time() - st.session_state.inicio_tiempo)
     if restante <= 0:
         st.session_state.finalizado = True
@@ -117,18 +101,17 @@ elif st.session_state.examen_iniciado and not st.session_state.finalizado:
     total = len(st.session_state.preguntas_examen)
     pregunta = st.session_state.preguntas_examen[actual]
     
-    # Barra Superior (Header)
-    c1, c2 = st.columns([2, 1])
-    with c1: 
-        st.write(f"Pregunta {actual + 1} de {total}")
+    col_header, col_timer = st.columns([2, 1])
+    with col_header:
+        st.write(f"Pregunta **{actual + 1}** de {total}")
         st.caption(f"Unidad: {pregunta['Clase']}")
-    with c2: 
+    with col_timer:
         st.markdown(f'<p class="timer-caja">⏳ {h:02d}:{m:02d}:{s:02d}</p>', unsafe_allow_html=True)
     
     st.progress((actual) / total)
     
-    # Botón de Finalización Temprana (en el lateral o arriba)
-    if st.button("🏁 Finalizar y ver nota ahora", key="exit_btn", help="Termina el examen con las preguntas que llevas respondidas"):
+    # Botón para salir
+    if st.button("🏁 Entregar examen ahora", type="secondary"):
         st.session_state.finalizado = True
         st.rerun()
 
@@ -146,21 +129,19 @@ elif st.session_state.examen_iniciado and not st.session_state.finalizado:
                 if st.session_state.eleccion == correcta_val:
                     st.session_state.aciertos += 1
                 st.rerun()
-        # Refresco para el reloj
         time.sleep(1)
         st.rerun()
     else:
         for op in opciones:
             op_s = op.strip()
-            if op_s == correcta_val: 
+            if op_s == correcta_val:
                 st.markdown(f'<div class="opcion-resultado correcta">✅ {op}</div>', unsafe_allow_html=True)
-            elif op_s == st.session_state.eleccion: 
+            elif op_s == st.session_state.eleccion:
                 st.markdown(f'<div class="opcion-resultado incorrecta">❌ {op}</div>', unsafe_allow_html=True)
-            else: 
+            else:
                 st.markdown(f'<div class="opcion-resultado neutral">{op}</div>', unsafe_allow_html=True)
         
         st.info(f"💡 **Explicación:** {pregunta['Explicación']}")
-        
         if st.button("Siguiente Pregunta ➡️", use_container_width=True, type="primary"):
             if actual + 1 < total:
                 st.session_state.indice_actual += 1
@@ -172,19 +153,10 @@ elif st.session_state.examen_iniciado and not st.session_state.finalizado:
 
 # --- VISTA 3: RESULTADOS ---
 elif st.session_state.finalizado:
-    st.title("🏁 Resultados Finales")
-    total_respondidas = st.session_state.indice_actual + (1 if st.session_state.respondido else 0)
-    st.metric("Aciertos", f"{st.session_state.aciertos} / {total_respondidas}")
-    
-    if total_respondidas > 0:
-        porcentaje = (st.session_state.aciertos / total_respondidas) * 100
-        st.write(f"Tu porcentaje de efectividad es del **{porcentaje:.1f}%**")
-    
-    if st.button("🔄 Volver al Inicio / Otro Examen"):
-        # Reset total del estado del examen
+    st.title("🏁 Resultados")
+    total_vistas = st.session_state.indice_actual + (1 if st.session_state.respondido else 0)
+    st.metric("Aciertos", f"{st.session_state.aciertos} / {total_vistas}")
+    if st.button("🔄 Nuevo examen"):
         st.session_state.examen_iniciado = False
         st.session_state.finalizado = False
-        st.session_state.indice_actual = 0
-        st.session_state.aciertos = 0
-        st.session_state.respondido = False
         st.rerun()
