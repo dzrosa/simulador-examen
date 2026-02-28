@@ -9,33 +9,16 @@ st.markdown("""
     <style>
     .block-container { padding-top: 1.5rem; }
     .pregunta-texto { font-size: 18px !important; font-weight: 600; margin-bottom: 15px; line-height: 1.3; }
-    
-    /* Tarjetas de respuesta reveladas */
     .opcion-resultado {
         padding: 12px;
         border-radius: 8px;
         margin-bottom: 8px;
         font-size: 16px;
-        border: 1px solid transparent;
+        border: 1px solid #dee2e6;
     }
-    .correcta {
-        background-color: #d4edda;
-        color: #155724;
-        border-color: #c3e6cb;
-        font-weight: bold;
-    }
-    .incorrecta {
-        background-color: #f8d7da;
-        color: #721c24;
-        border-color: #f5c6cb;
-    }
-    .neutral {
-        background-color: #f1f3f5;
-        color: #6c757d;
-        border-color: #dee2e6;
-        opacity: 0.7;
-    }
-    
+    .correcta { background-color: #d4edda; color: #155724; border-color: #c3e6cb; font-weight: bold; }
+    .incorrecta { background-color: #f8d7da; color: #721c24; border-color: #f5c6cb; }
+    .neutral { background-color: #f1f3f5; color: #6c757d; opacity: 0.7; }
     .explicacion-caja {
         font-size: 18px !important;
         background-color: #e9f5ff;
@@ -61,6 +44,4 @@ def load_data():
     except:
         return None
 
-# --- INICIALIZACIÓN ---
-if 'examen_iniciado' not in st.session_state:
-    st.session_state.update({
+# --- INICIALIZACIÓN DE VARIABLES
