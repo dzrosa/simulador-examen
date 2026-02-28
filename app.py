@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import random
 import time
-from datetime import datetime, timedelta
 
 st.set_page_config(page_title="Simulador de Examen", page_icon="🎓", layout="centered")
 
@@ -16,8 +15,7 @@ st.markdown("""
     .incorrecta { background-color: #f8d7da; color: #721c24; border-color: #f5c6cb; }
     .neutral { background-color: #f1f3f5; color: #6c757d; opacity: 0.7; }
     .explicacion-caja { font-size: 18px !important; background-color: #e9f5ff; padding: 15px; border-radius: 10px; color: #0c5460; border-left: 5px solid #17a2b8; margin-top: 20px; }
-    /* Estilo para el cronómetro */
-    .timer-caja { font-size: 20px; font-weight: bold; color: #d9534f; text-align: right; margin-bottom: 10px; }
+    .timer-caja { font-size: 20px; font-weight: bold; color: #d9534f; text-align: right; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -31,7 +29,8 @@ def load_data():
         data = pd.read_csv(CSV_URL)
         data.columns = [c.strip() for c in data.columns]
         return data
-    except: return None
+    except:
+        return None
 
 # --- INICIALIZACIÓN ---
 if 'examen_iniciado' not in st.session_state:
@@ -53,5 +52,22 @@ if not st.session_state.examen_iniciado and not st.session_state.finalizado:
         st.write(f"Preguntas disponibles: **{len(df)}**")
         st.write("⏱️ Tiempo límite: **1 hora y 30 minutos**")
         if st.button("🚀 COMENZAR EXAMEN", use_container_width=True, type="primary"):
-            cantidad = min(60, len(df))
-            indices = random.sample(range(
+            # Lógica corregida y simplificada para evitar SyntaxError
+            total_preguntas = len(df)
+            cantidad = min(60, total_preguntas)
+            lista_indices = list(range(total_preguntas))
+            indices_aleatorios = random.sample(lista_indices, cantidad)
+            
+            st.session_state.preguntas_examen = df.iloc[indices_aleatorios].to_dict('records')
+            st.session_state.examen_iniciado = True
+            st.session_state.inicio_tiempo = time.time()
+            st.rerun()
+
+# --- VISTA: RESULTADOS ---
+elif st.session_state.finalizado:
+    st.title("🏁 Resultados")
+    st.metric("Aciertos", f"{st.session_state.aciertos} / {len(st.session_state.preguntas_examen)}")
+    if st.button("🔄 Intentar de nuevo", use_container_width=True):
+        st.session_state.examen_iniciado = False
+        st.session_state.finalizado = False
+        st.session_state.indice_actual = 0
