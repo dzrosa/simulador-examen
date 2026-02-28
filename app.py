@@ -52,11 +52,65 @@ if not st.session_state.acceso_concedido:
     clave_user = st.text_input("Clave de acceso (PIN):", type="password").strip()
     
     if st.button("Validar Credenciales", use_container_width=True, type="primary"):
-        if df_usuarios is not None:
-            # Buscamos al usuario por email
+        if df_usuarios is None:
+            st.error("Error al conectar con la base de datos.")
+        else:
             user_match = df_usuarios[df_usuarios['email'] == email_user]
-            
-            if not user_match.empty:
-                # Verificamos la clave
+            if user_match.empty:
+                st.error("El correo no se encuentra registrado.")
+            else:
                 clave_correcta = str(user_match.iloc[0]['clave']).strip()
                 if clave_user == clave_correcta:
+                    st.session_state.acceso_concedido = True
+                    st.rerun()
+                else:
+                    st.error("La clave ingresada es incorrecta.")
+    st.stop()
+
+# --- INICIALIZACIÓN DE VARIABLES DEL EXAMEN ---
+if 'examen_iniciado' not in st.session_state:
+    st.session_state.update({
+        'examen_iniciado': False, 
+        'finalizado': False, 
+        'indice_actual': 0,
+        'aciertos': 0, 
+        'respondido': False, 
+        'preguntas_examen': [],
+        'inicio_tiempo': 0, 
+        'eleccion': None
+    })
+
+# --- VISTAS DEL EXAMEN ---
+if not st.session_state.examen_iniciado and not st.session_state.finalizado:
+    st.title("🚀 Prepárate para el examen")
+    if df_preguntas is not None:
+        lista_clases = sorted(df_preguntas['Clase'].unique().tolist())
+        opciones = ["Todas las Clases"] + lista_clases
+        clase_sel = st.selectbox("Selecciona tu unidad de estudio:", opciones)
+        
+        df_f = df_preguntas if clase_sel == "Todas las Clases" else df_preguntas[df_preguntas['Clase'] == clase_sel]
+        
+        if st.button("COMENZAR SIMULACRO", use_container_width=True, type="primary"):
+            pool = df_f.to_dict('records')
+            random.shuffle(pool)
+            st.session_state.preguntas_examen = pool[:60]
+            st.session_state.inicio_tiempo = time.time()
+            st.session_state.examen_iniciado = True
+            st.rerun()
+
+elif st.session_state.examen_iniciado and not st.session_state.finalizado:
+    restante = 5400 - (time.time() - st.session_state.inicio_tiempo)
+    if restante <= 0:
+        st.session_state.finalizado = True
+        st.rerun()
+
+    m, s = divmod(int(restante), 60)
+    h, m = divmod(m, 60)
+    
+    actual = st.session_state.indice_actual
+    total = len(st.session_state.preguntas_examen)
+    pregunta = st.session_state.preguntas_examen[actual]
+    
+    c1, c2 = st.columns([2, 1])
+    with c1: st.write(f"Pregunta {actual + 1} de {total}")
+    with c2
