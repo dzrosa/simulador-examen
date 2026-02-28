@@ -49,14 +49,67 @@ def cargar_datos():
 
 df_preguntas, df_usuarios = cargar_datos()
 
-# Estilos CSS
+# 3. ESTILOS CSS (FORZANDO TEMA CLARO Y CONTRASTE)
 st.markdown("""
     <style>
-    .pregunta-texto { font-size: 1.2rem; font-weight: bold; color: #1e293b; margin-bottom: 1.5rem; }
-    .res-box { padding: 14px; border-radius: 10px; margin-bottom: 10px; border: 2px solid #cbd5e1; }
-    .res-correcta { background-color: #22c55e !important; color: white !important; font-weight: bold; }
-    .res-incorrecta { background-color: #ef4444 !important; color: white !important; }
-    .res-neutral { background-color: #f8fafc; color: #334155; }
+    /* Forzar fondo blanco en toda la app */
+    .stApp {
+        background-color: white !important;
+        color: #1e293b !important;
+    }
+
+    /* Forzar color de texto en inputs y etiquetas */
+    .stMarkdown, p, span, label, .stCaption {
+        color: #1e293b !important;
+    }
+
+    /* Estilo de la pregunta */
+    .pregunta-texto { 
+        font-size: 1.2rem; 
+        font-weight: bold; 
+        color: #0f172a !important; 
+        margin-bottom: 1.5rem; 
+    }
+
+    /* Cajas de respuestas */
+    .res-box { 
+        padding: 14px; 
+        border-radius: 10px; 
+        margin-bottom: 10px; 
+        border: 2px solid #cbd5e1; 
+        color: #334155 !important;
+    }
+
+    /* Colores fijos para feedback (no cambian en dark mode) */
+    .res-correcta { 
+        background-color: #22c55e !important; 
+        color: white !important; 
+        font-weight: bold; 
+        border-color: #16a34a !important; 
+    }
+    .res-incorrecta { 
+        background-color: #ef4444 !important; 
+        color: white !important; 
+        border-color: #dc2626 !important; 
+    }
+    .res-neutral { 
+        background-color: #f1f5f9 !important; 
+        color: #1e293b !important; 
+    }
+
+    /* Forzar que los botones de Streamlit se vean bien */
+    .stButton>button {
+        color: #1e293b !important;
+        background-color: #f8fafc !important;
+        border: 1px solid #cbd5e1 !important;
+    }
+    
+    /* Botón primario (Empezar/Siguiente) siempre azul con texto blanco */
+    .stButton>button[kind="primary"] {
+        color: white !important;
+        background-color: #2563eb !important;
+        border: none !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -164,3 +217,4 @@ elif s['end']:
     if st.button("🔄 Reiniciar", use_container_width=True):
         st.session_state.s = {'active': False, 'end': False, 'idx': 0, 'score': 0, 'ans': False, 'qs': [], 'choice': None}
         st.rerun()
+
