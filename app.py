@@ -6,7 +6,7 @@ import time
 # Configuración inicial
 st.set_page_config(page_title="Simulador Premium - Biología 91", page_icon="🎓", layout="centered")
 
-# --- TEMARIO COMPLETO (Extraído del PDF) ---
+# --- TEMARIO COMPLETO ---
 TEMARIO = {
     "1": "Características de los seres vivos y Teoría celular",
     "2": "Estructura atómica, Agua y pH",
@@ -80,7 +80,7 @@ if not st.session_state.acceso_concedido:
                 st.error("Credenciales incorrectas.")
     st.stop()
 
-# --- ESTADO DEL EXAMEN ---
+# --- VARIABLES DE ESTADO ---
 if 'examen_iniciado' not in st.session_state:
     st.session_state.update({'examen_iniciado': False, 'finalizado': False, 'indice_actual': 0, 'aciertos': 0, 'respondido': False, 'preguntas_examen': [], 'inicio_tiempo': 0, 'eleccion': None})
 
@@ -88,8 +88,17 @@ if 'examen_iniciado' not in st.session_state:
 if not st.session_state.examen_iniciado and not st.session_state.finalizado:
     st.title("🚀 Panel de Estudio")
     if df_preguntas is not None:
-        # ORDENAMIENTO NUMÉRICO: Convertimos a int para ordenar y luego a str para mostrar
-        clases_num = sorted([int(c) for c in df_preguntas['Clase'].unique()])
+        # --- SOLUCIÓN AL ERROR DE VALOR ---
+        # Filtramos solo lo que sea convertible a número para evitar que la app se rompa
+        clases_unicas = df_preguntas['Clase'].dropna().unique()
+        clases_validas = []
+        for c in clases_unicas:
+            try:
+                clases_validas.append(int(float(c))) # Maneja "1" y "1.0"
+            except:
+                continue # Si es un texto, lo ignora
+        
+        clases_num = sorted(list(set(clases_validas)))
         
         opciones_visuales = []
         for c in clases_num:
@@ -106,8 +115,10 @@ if not st.session_state.examen_iniciado and not st.session_state.finalizado:
             st.info("💡 Sin selección. Practicarás todas las unidades.")
             df_f = df_preguntas
         else:
-            df_f = df_preguntas[df_preguntas['Clase'].astype(str).isin(clases_finales)]
-            st.success(f"Unidades seleccionadas: {', '.join(clases_finales)}")
+            # Filtro flexible que convierte todo a string para comparar
+            df_f = df_preguntas[df_preguntas['Clase'].astype(str).str.contains('|'.join(clases_finales))]
+            # Refinamiento para asegurar coincidencia exacta
+            df_f = df_preguntas[df_preguntas['Clase'].astype(str).apply(lambda x: x.split('.')[0] in clases_finales)]
         
         st.metric("Preguntas en pool", len(df_f))
         
@@ -121,38 +132,31 @@ if not st.session_state.examen_iniciado and not st.session_state.finalizado:
             st.session_state.aciertos = 0
             st.rerun()
 
-# --- VISTA 2: EXAMEN ---
+# --- VISTA 2: EXAMEN (Igual que antes) ---
 elif st.session_state.examen_iniciado and not st.session_state.finalizado:
     restante = 5400 - (time.time() - st.session_state.inicio_tiempo)
     if restante <= 0:
         st.session_state.finalizado = True
         st.rerun()
-
     m, s = divmod(int(restante), 60)
     h, m = divmod(m, 60)
     actual = st.session_state.indice_actual
     total = len(st.session_state.preguntas_examen)
     pregunta = st.session_state.preguntas_examen[actual]
-    
-    col_header, col_timer = st.columns([2, 1])
-    with col_header:
+    c1, c2 = st.columns([2, 1])
+    with c1:
         st.write(f"Pregunta **{actual + 1}** de {total}")
-        st.caption(f"Unidad {pregunta['Clase']}: {TEMARIO.get(str(pregunta['Clase']), 'Tema General')}")
-    with col_timer:
+        st.caption(f"Unidad {pregunta['Clase']}: {TEMARIO.get(str(pregunta['Clase']).split('.')[0], 'Tema General')}")
+    with c2:
         st.markdown(f'<p class="timer-caja">⏳ {h:02d}:{m:02d}:{s:02d}</p>', unsafe_allow_html=True)
-    
     st.progress((actual) / total)
-    
     if st.button("🏁 Entregar examen ahora", type="secondary"):
         st.session_state.finalizado = True
         st.rerun()
-
     st.markdown("---")
     st.markdown(f'<p class="pregunta-texto">{pregunta["Pregunta"]}</p>', unsafe_allow_html=True)
-    
     opciones = [str(pregunta['Opción A']), str(pregunta['Opción B']), str(pregunta['Opción C']), str(pregunta['Opción D'])]
     correcta_val = str(pregunta['Opción Correcta']).strip()
-
     if not st.session_state.respondido:
         for idx, op in enumerate(opciones):
             if st.button(op, key=f"q_{actual}_{idx}", use_container_width=True):
@@ -166,13 +170,9 @@ elif st.session_state.examen_iniciado and not st.session_state.finalizado:
     else:
         for op in opciones:
             op_s = op.strip()
-            if op_s == correcta_val:
-                st.markdown(f'<div class="opcion-resultado correcta">✅ {op}</div>', unsafe_allow_html=True)
-            elif op_s == st.session_state.eleccion:
-                st.markdown(f'<div class="opcion-resultado incorrecta">❌ {op}</div>', unsafe_allow_html=True)
-            else:
-                st.markdown(f'<div class="opcion-resultado neutral">{op}</div>', unsafe_allow_html=True)
-        
+            if op_s == correcta_val: st.markdown(f'<div class="opcion-resultado correcta">✅ {op}</div>', unsafe_allow_html=True)
+            elif op_s == st.session_state.eleccion: st.markdown(f'<div class="opcion-resultado incorrecta">❌ {op}</div>', unsafe_allow_html=True)
+            else: st.markdown(f'<div class="opcion-resultado neutral">{op}</div>', unsafe_allow_html=True)
         st.info(f"💡 **Explicación:** {pregunta['Explicación']}")
         if st.button("Siguiente Pregunta ➡️", use_container_width=True, type="primary"):
             if actual + 1 < total:
@@ -183,7 +183,6 @@ elif st.session_state.examen_iniciado and not st.session_state.finalizado:
                 st.session_state.finalizado = True
                 st.rerun()
 
-# --- VISTA 3: RESULTADOS ---
 elif st.session_state.finalizado:
     st.title("🏁 Resultados")
     total_vistas = st.session_state.indice_actual + (1 if st.session_state.respondido else 0)
