@@ -71,38 +71,4 @@ if not st.session_state.acceso_concedido:
 if 'examen_iniciado' not in st.session_state:
     st.session_state.update({
         'examen_iniciado': False, 
-        'finalizado': False, 
-        'indice_actual': 0,
-        'aciertos': 0, 
-        'respondido': False, 
-        'preguntas_examen': [],
-        'inicio_tiempo': 0, 
-        'eleccion': None
-    })
-
-# --- VISTAS DEL EXAMEN ---
-if not st.session_state.examen_iniciado and not st.session_state.finalizado:
-    st.title("🚀 Prepárate para el examen")
-    if df_preguntas is not None:
-        lista_clases = sorted(df_preguntas['Clase'].unique().tolist())
-        opciones = ["Todas las Clases"] + lista_clases
-        clase_sel = st.selectbox("Selecciona tu unidad de estudio:", opciones)
-        
-        df_f = df_preguntas if clase_sel == "Todas las Clases" else df_preguntas[df_preguntas['Clase'] == clase_sel]
-        
-        if st.button("COMENZAR SIMULACRO", use_container_width=True, type="primary"):
-            pool = df_f.to_dict('records')
-            random.shuffle(pool)
-            st.session_state.preguntas_examen = pool[:60]
-            st.session_state.inicio_tiempo = time.time()
-            st.session_state.examen_iniciado = True
-            st.rerun()
-
-elif st.session_state.examen_iniciado and not st.session_state.finalizado:
-    restante = 5400 - (time.time() - st.session_state.inicio_tiempo)
-    if restante <= 0:
-        st.session_state.finalizado = True
-        st.rerun()
-
-    m, s = divmod(int(restante), 60)
-    h, m = divmod(m
+        '
