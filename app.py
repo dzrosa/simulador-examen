@@ -117,8 +117,11 @@ if not st.session_state.auth:
     if st.button("Entrar", use_container_width=True):
         if df_usuarios is not None:
             match = df_usuarios[df_usuarios['email'] == u]
-            if not match.empty and str(match.iloc[0]['clave']).strip() == p:
+            # Convertimos ambos valores a String limpio para que no falle si el PIN es un número en el Excel
+            if not match.empty and str(match.iloc[0]['clave']).split('.')[0].strip() == p:
                 st.session_state.auth = True; st.rerun()
+            else:
+                st.error("Email o PIN incorrectos. Intentá de nuevo.")
     st.stop()
 
 if 's' not in st.session_state:
