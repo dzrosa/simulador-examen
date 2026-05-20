@@ -31,7 +31,8 @@ TEMARIO_DETALLE = {
     "19": "Replicación del ADN y Mutaciones",
     "20": "Mitosis y Citocinesis",
     "21": "Meiosis y Crossing-over",
-    "0": "Parcialito 1"
+    "0": "Parcialito 1",
+    "22": "Mitocondria"
 }
 
 @st.cache_data(ttl=60)
