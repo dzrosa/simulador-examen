@@ -30,7 +30,8 @@ TEMARIO_DETALLE = {
     "18": "Ciclo celular y Control",
     "19": "Replicación del ADN y Mutaciones",
     "20": "Mitosis y Citocinesis",
-    "21": "Meiosis y Crossing-over"
+    "21": "Meiosis y Crossing-over",
+    "22": "Parcialito 1"
 }
 
 @st.cache_data(ttl=60)
